@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { clips, withTenant } from "@creatorhq/db";
+import { speicherSchluessel } from "@creatorhq/shared";
 import { getSession } from "@/lib/auth";
 import { putObject } from "@/lib/storage";
 
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     try {
       const clipId = randomUUID();
-      const key = `imports/${clipId}.mp4`;
+      const key = speicherSchluessel(session.tenantId, "imports", `${clipId}.mp4`);
       const body = Buffer.from(await file.arrayBuffer());
       await putObject(key, body, "video/mp4");
 

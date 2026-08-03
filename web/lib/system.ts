@@ -8,6 +8,7 @@ import {
   withTenant,
 } from "@creatorhq/db";
 import {
+  bereichsPraefix,
   DEFAULT_TIMEZONE,
   planNachziehen,
   type NachziehGruppe,
@@ -252,14 +253,25 @@ async function verzeichnisGroesse(relativ: string): Promise<number> {
   return summe;
 }
 
-export async function speicherPosten(): Promise<SpeicherPosten[]> {
+export async function speicherPosten(tenantId: string): Promise<SpeicherPosten[]> {
+  // Nur der eigene Verbrauch: Ohne das Präfix sähe jeder Creator die Summe
+  // aller Kunden.
   const posten = await Promise.allSettled([
-    praefixGroesse("sources/").then((r) => ({ name: "Quellvideos", ...r })),
-    praefixGroesse("clips/").then((r) => ({ name: "Fertige Clips", ...r })),
-    praefixGroesse("thumbs/").then((r) => ({ name: "Vorschaubilder", ...r })),
-    // Davids hochgeladene Instagram-Clips: die einzigen Dateien im System,
+    praefixGroesse(bereichsPraefix(tenantId, "sources")).then((r) => ({
+      name: "Quellvideos",
+      ...r,
+    })),
+    praefixGroesse(bereichsPraefix(tenantId, "clips")).then((r) => ({
+      name: "Fertige Clips",
+      ...r,
+    })),
+    praefixGroesse(bereichsPraefix(tenantId, "thumbs")).then((r) => ({
+      name: "Vorschaubilder",
+      ...r,
+    })),
+    // Hochgeladene Instagram-Clips: die einzigen Dateien im System,
     // die sich aus keiner Quelle neu erzeugen lassen.
-    praefixGroesse("imports/").then((r) => ({
+    praefixGroesse(bereichsPraefix(tenantId, "imports")).then((r) => ({
       name: "Instagram-Importe",
       ...r,
       unersetzlich: true,

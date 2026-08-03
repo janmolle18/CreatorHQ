@@ -1,6 +1,14 @@
 import { Worker, type Job } from "bullmq";
 import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
-import { db, clips, posts, settings, socialAccounts, sourceVideos } from "@creatorhq/db";
+import {
+  clips,
+  posts,
+  settings,
+  socialAccounts,
+  sourceVideos,
+  withTenant,
+  type DB,
+} from "@creatorhq/db";
 import {
   classificationReason,
   classifySource,
@@ -9,8 +17,23 @@ import {
 } from "@creatorhq/shared";
 import { env } from "./env.ts";
 import { logger } from "./logger.ts";
-import { connection, QUEUE, queues, reiheEinmalEin } from "./queues.ts";
+import {
+  connection,
+  QUEUE,
+  queues,
+  reiheEinmalEin,
+  type ClipJob,
+  type MandantenJob,
+  type PostJob,
+  type SourceVideoJob,
+} from "./queues.ts";
 import { autoPublishEnabled } from "./settings.ts";
+import {
+  imAuftragsMandanten,
+  jeMandant,
+  mandantAusAuftrag,
+  MAX_JE_MANDANT_PRO_DURCHGANG,
+} from "./tenant.ts";
 import { ensureBucket } from "./integrations/storage.ts";
 import { markSourceAsReference } from "./jobs/reference.ts";
 import { getChannelUploads } from "./integrations/youtube.ts";
@@ -46,9 +69,9 @@ const downloadWorker = new Worker(
   async (job: Job) => {
     switch (job.name) {
       case "download":
-        return processDownload(job as Job<{ sourceVideoId: string }>);
+        return processDownload(job as Job<SourceVideoJob>);
       case "validate-import":
-        return processValidateImport(job as Job<{ clipId: string }>);
+        return processValidateImport(job as Job<ClipJob>);
       default:
         logger.warn({ name: job.name }, "download-queue: unbekannter Job");
     }
@@ -62,9 +85,9 @@ const clipWorker = new Worker(
   async (job: Job) => {
     switch (job.name) {
       case "clip":
-        return processClip(job as Job<{ sourceVideoId: string }>);
+        return processClip(job as Job<SourceVideoJob>);
       case "enrich":
-        return processEnrich(job as Job<{ clipId: string }>);
+        return processEnrich(job as Job<ClipJob>);
       default:
         logger.warn({ name: job.name }, "clip-queue: unbekannter Job");
     }
@@ -82,28 +105,28 @@ const renderWorker = new Worker(
 // ── Analytics-Queue: tägliche Snapshots ──
 const analyticsWorker = new Worker(
   QUEUE.analytics,
-  async () => processAnalytics(),
+  async (job: Job<MandantenJob>) => processAnalytics(job),
   { connection, concurrency: 1, ...LONG }
 );
 
 // ── Comments-Queue: Kommentar-Sync (YouTube keyless-fähig, IG verbunden) ──
 const commentsWorker = new Worker(
   QUEUE.comments,
-  async () => syncAllComments(),
+  async (job: Job<MandantenJob>) => syncAllComments(mandantAusAuftrag(job)),
   { connection, concurrency: 1, ...LONG }
 );
 
 // ── Briefing-Queue: tägliches Claude-Briefing (synct Kommentare zuerst) ──
 const briefingWorker = new Worker(
   QUEUE.briefing,
-  async () => processBriefing(),
+  async (job: Job<MandantenJob>) => processBriefing(job),
   { connection, concurrency: 1, ...LONG }
 );
 
 // ── Publish-Queue: Plattform-Uploads (API-Rate-limitiert) ──
 const publishWorker = new Worker(
   QUEUE.publish,
-  async (job: Job) => processPublish(job as Job<{ postId: string }>),
+  async (job: Job) => processPublish(job as Job<PostJob>),
   { connection, concurrency: 2, ...LONG }
 );
 
@@ -116,7 +139,11 @@ const publishWorker = new Worker(
  * Quelldatei noch im Speicher liegt — so räumt jeder Scan Reste auf, ohne bei
  * sauberen Zeilen Arbeit zu machen.
  */
-async function markAsReference(externalId: string, reason: string): Promise<void> {
+async function markAsReference(
+  db: DB,
+  externalId: string,
+  reason: string
+): Promise<void> {
   const [existing] = await db
     .select({
       id: sourceVideos.id,
@@ -140,7 +167,7 @@ async function markAsReference(externalId: string, reason: string): Promise<void
   if (!existing) return;
   if (existing.status === "reference" && existing.storagePath === null) return;
 
-  await markSourceAsReference({
+  await markSourceAsReference(db, {
     sourceVideoId: existing.id,
     storagePath: existing.storagePath,
     reason,
@@ -148,7 +175,10 @@ async function markAsReference(externalId: string, reason: string): Promise<void
 }
 
 // ── Discovery: Kanal scannen und neue Videos als source_videos anlegen ──
-async function scanChannel(): Promise<{ found: number; added: number }> {
+async function scanChannel(
+  db: DB,
+  tenantId: string
+): Promise<{ found: number; added: number }> {
   const [config] = await db.select().from(settings).limit(1);
   const identifier = config?.youtubeChannelId || env.pipeline.defaultYoutubeHandle;
 
@@ -164,6 +194,7 @@ async function scanChannel(): Promise<{ found: number; added: number }> {
     const inserted = await db
       .insert(sourceVideos)
       .values({
+        tenantId,
         sourceKind: "youtube_video",
         platform: "youtube",
         externalId: video.externalId,
@@ -195,7 +226,7 @@ async function scanChannel(): Promise<{ found: number; added: number }> {
           )
         );
     }
-    if (isReference) await markAsReference(video.externalId, classificationReason(video));
+    if (isReference) await markAsReference(db, video.externalId, classificationReason(video));
   }
 
   // Twitch-VODs (vorbereitet): nur wenn User-ID und App-Credentials existieren.
@@ -205,6 +236,7 @@ async function scanChannel(): Promise<{ found: number; added: number }> {
       const inserted = await db
         .insert(sourceVideos)
         .values({
+          tenantId,
           sourceKind: "twitch_vod",
           platform: "twitch",
           externalId: vod.externalId,
@@ -219,7 +251,7 @@ async function scanChannel(): Promise<{ found: number; added: number }> {
   }
 
   logger.info(
-    { identifier, found: videos.length, added, reference },
+    { tenantId, identifier, found: videos.length, added, reference },
     "scan-channel: fertig"
   );
   return { found: videos.length, added };
@@ -230,173 +262,214 @@ const maintenanceWorker = new Worker(
   QUEUE.maintenance,
   async (job: Job) => {
     switch (job.name) {
+      // Von Hand aus dem Dashboard — gilt genau für den Mandanten, der klickt.
       case "scan-channel":
-        return scanChannel();
+        return imAuftragsMandanten(job, (db, tenantId) => scanChannel(db, tenantId));
 
-      case "discovery-tick": {
-        const [config] = await db.select().from(settings).limit(1);
-        if (!config?.autoDiscovery) return;
-        return scanChannel();
-      }
+      case "discovery-tick":
+        return jeMandant("discovery-tick", async (db, tenantId) => {
+          const [config] = await db.select().from(settings).limit(1);
+          // Der Schalter gehört dem Mandanten: Wer die Suche aus hat, wird
+          // übersprungen, ohne die anderen aufzuhalten.
+          if (!config?.autoDiscovery) return;
+          await scanChannel(db, tenantId);
+        });
 
-      case "promote-approved": {
-        // Freigegebene Clips ins Rendering schieben (jobId dedupliziert).
-        const approved = await db
-          .select({ id: clips.id })
-          .from(clips)
-          .where(eq(clips.status, "approved"));
-        for (const clip of approved) {
-          await reiheEinmalEin(queues.render, "render", { clipId: clip.id }, `render-${clip.id}`);
-        }
-        if (approved.length > 0) {
-          logger.info({ count: approved.length }, "promote-approved: eingereiht");
-        }
+      case "promote-approved":
+        return jeMandant("promote-approved", async (db, tenantId) => {
+          // Freigegebene Clips ins Rendering schieben (jobId dedupliziert).
+          // Gedeckelt: Der Takt läuft alle 30 Sekunden und ist selbstheilend —
+          // was jetzt nicht drankommt, kommt gleich dran. Ohne Deckel schöbe
+          // ein Mandant mit fünfzig Freigaben fünfzig Aufträge auf einmal in
+          // die Schlange, und der nächste Creator wartet dahinter.
+          const approved = await db
+            .select({ id: clips.id })
+            .from(clips)
+            .where(eq(clips.status, "approved"))
+            .limit(MAX_JE_MANDANT_PRO_DURCHGANG);
+          for (const clip of approved) {
+            await reiheEinmalEin(
+              queues.render,
+              "render",
+              { tenantId, clipId: clip.id },
+              `render-${clip.id}`
+            );
+          }
+          if (approved.length > 0) {
+            logger.info({ tenantId, count: approved.length }, "promote-approved: eingereiht");
+          }
 
-        // Sweep: gerenderte Clips mit Zielen, aber ohne Posts → Scheduling.
-        const unscheduled = await db
-          .select({ id: clips.id })
-          .from(clips)
-          .where(
-            and(eq(clips.status, "rendered"), sql`cardinality(${clips.targets}) > 0`)
-          );
-        for (const clip of unscheduled) {
-          await reiheEinmalEin(
-            queues.maintenance,
-            "schedule",
-            { clipId: clip.id },
-            `schedule-${clip.id}`
-          );
-        }
-        break;
-      }
+          // Sweep: gerenderte Clips mit Zielen, aber ohne Posts → Scheduling.
+          const unscheduled = await db
+            .select({ id: clips.id })
+            .from(clips)
+            .where(and(eq(clips.status, "rendered"), sql`cardinality(${clips.targets}) > 0`))
+            .limit(MAX_JE_MANDANT_PRO_DURCHGANG);
+          for (const clip of unscheduled) {
+            await reiheEinmalEin(
+              queues.maintenance,
+              "schedule",
+              { tenantId, clipId: clip.id },
+              `schedule-${clip.id}`
+            );
+          }
+        });
 
       case "schedule":
-        return processSchedule(job as Job<{ clipId: string }>);
+        return processSchedule(job as Job<ClipJob>);
 
+      // Fächert die Tagesläufe auf: ein Auftrag JE MANDANT statt einem großen.
+      // So reißt ein Kunde mit kaputtem Konto die Messung der anderen nicht mit.
+      case "analytics-tick":
+        return jeMandant("analytics-tick", async (_db, tenantId) => {
+          await reiheEinmalEin(
+            queues.analytics,
+            "daily-analytics",
+            { tenantId },
+            `analytics-${tenantId}-${new Date().toISOString().slice(0, 10)}`
+          );
+        });
+
+      case "briefing-tick":
+        return jeMandant("briefing-tick", async (_db, tenantId) => {
+          await reiheEinmalEin(
+            queues.briefing,
+            "daily-briefing",
+            { tenantId },
+            `briefing-${tenantId}-${new Date().toISOString().slice(0, 10)}`
+          );
+        });
+
+      // Plattformweit, nicht je Mandant: sichert die GESAMTE Datenbank.
       case "backup-daily":
         return processBackup();
 
       case "cleanup-daily":
-        return processCleanup();
+        return jeMandant("cleanup-daily", (db) => processCleanup(db));
 
-      case "refresh-ig-token": {
-        // Wöchentlich: Long-lived-Token (60 Tage) proaktiv verlängern.
-        const [ig] = await db
-          .select()
-          .from(socialAccounts)
-          .where(eq(socialAccounts.platform, "instagram"));
-        if (!ig?.accessTokenEnc || ig.status !== "connected") return;
-        try {
-          const tokens = await refreshIgToken(decryptSecret(ig.accessTokenEnc));
-          const encrypted = encryptSecret(tokens.accessToken);
-          await db
-            .update(socialAccounts)
-            .set({
-              accessTokenEnc: encrypted,
-              refreshTokenEnc: encrypted,
-              tokenExpiresAt: tokens.expiresAt,
-              lastError: null,
-              updatedAt: new Date(),
-            })
-            .where(eq(socialAccounts.id, ig.id));
-          logger.info({ expiresAt: tokens.expiresAt }, "refresh-ig-token: verlängert");
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          await db
-            .update(socialAccounts)
-            .set({ status: "expired", lastError: message.slice(0, 300), updatedAt: new Date() })
-            .where(eq(socialAccounts.id, ig.id));
-          logger.warn({ err: message }, "refresh-ig-token: fehlgeschlagen — Account expired");
-        }
-        break;
-      }
+      case "refresh-ig-token":
+        return jeMandant("refresh-ig-token", async (db, tenantId) => {
+          // Wöchentlich: Long-lived-Token (60 Tage) proaktiv verlängern.
+          const [ig] = await db
+            .select()
+            .from(socialAccounts)
+            .where(eq(socialAccounts.platform, "instagram"));
+          if (!ig?.accessTokenEnc || ig.status !== "connected") return;
+          try {
+            const tokens = await refreshIgToken(decryptSecret(ig.accessTokenEnc));
+            const encrypted = encryptSecret(tokens.accessToken);
+            await db
+              .update(socialAccounts)
+              .set({
+                accessTokenEnc: encrypted,
+                refreshTokenEnc: encrypted,
+                tokenExpiresAt: tokens.expiresAt,
+                lastError: null,
+                updatedAt: new Date(),
+              })
+              .where(eq(socialAccounts.id, ig.id));
+            logger.info({ tenantId, expiresAt: tokens.expiresAt }, "refresh-ig-token: verlängert");
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            await db
+              .update(socialAccounts)
+              .set({ status: "expired", lastError: message.slice(0, 300), updatedAt: new Date() })
+              .where(eq(socialAccounts.id, ig.id));
+            logger.warn(
+              { tenantId, err: message },
+              "refresh-ig-token: fehlgeschlagen — Konto auf abgelaufen gesetzt"
+            );
+          }
+        });
 
-      case "due-posts": {
-        // Steckengebliebene Uploads einsammeln, bevor neue Arbeit kommt.
-        //
-        // Stirbt der Worker mitten im Upload (Neustart, Speichermangel), bleibt
-        // der Post auf „uploading" stehen: Der Takt unten greift nur
-        // „scheduled", und der BullMQ-Job gilt als erledigt. Ohne dieses
-        // Aufräumen hängt er dort für immer — unsichtbar, weil er auch nirgends
-        // als gescheitert auftaucht.
-        const zombies = await db
-          .update(posts)
-          .set({ status: "scheduled", updatedAt: new Date() })
-          .where(
-            and(
-              eq(posts.status, "uploading"),
-              lte(posts.updatedAt, new Date(Date.now() - ZOMBIE_NACH_MS))
+      case "due-posts":
+        return jeMandant("due-posts", async (db, tenantId) => {
+          // Steckengebliebene Uploads einsammeln, bevor neue Arbeit kommt.
+          //
+          // Stirbt der Worker mitten im Upload (Neustart, Speichermangel),
+          // bleibt der Post auf „uploading" stehen: Der Takt unten greift nur
+          // „scheduled", und der BullMQ-Auftrag gilt als erledigt. Ohne dieses
+          // Aufräumen hängt er dort für immer — unsichtbar, weil er auch
+          // nirgends als gescheitert auftaucht.
+          const zombies = await db
+            .update(posts)
+            .set({ status: "scheduled", updatedAt: new Date() })
+            .where(
+              and(
+                eq(posts.status, "uploading"),
+                lte(posts.updatedAt, new Date(Date.now() - ZOMBIE_NACH_MS))
+              )
             )
-          )
-          .returning({ id: posts.id });
-        if (zombies.length > 0) {
-          logger.warn(
-            { count: zombies.length },
-            "due-posts: hängende Uploads zurückgestellt"
-          );
-        }
+            .returning({ id: posts.id });
+          if (zombies.length > 0) {
+            logger.warn(
+              { tenantId, count: zombies.length },
+              "due-posts: hängende Uploads zurückgestellt"
+            );
+          }
 
-        // Hauptschalter: ohne ihn postet die App nichts von selbst. David
-        // arbeitet dann wie bisher über den manuellen Weg weiter — sichtbar
-        // auf /system, damit das kein stiller Stillstand ist.
-        if (!(await autoPublishEnabled())) break;
+          // Hauptschalter — je Mandant. Wer ihn aus hat, arbeitet weiter über
+          // den manuellen Weg; sichtbar auf /system, damit das kein stiller
+          // Stillstand ist.
+          if (!(await autoPublishEnabled(tenantId))) return;
 
-        // Fällige geplante Posts an die Publish-Queue übergeben.
-        const due = await db
-          .select({ id: posts.id })
-          .from(posts)
-          .where(and(eq(posts.status, "scheduled"), lte(posts.scheduledAt, new Date())));
-        for (const post of due) {
-          await reiheEinmalEin(
-            queues.publish,
-            "publish",
-            { postId: post.id },
-            `publish-${post.id}`
-          );
-        }
-        if (due.length > 0) {
-          logger.info({ count: due.length }, "due-posts: eingereiht");
-        }
-        break;
-      }
+          const due = await db
+            .select({ id: posts.id })
+            .from(posts)
+            .where(and(eq(posts.status, "scheduled"), lte(posts.scheduledAt, new Date())))
+            .limit(MAX_JE_MANDANT_PRO_DURCHGANG);
+          for (const post of due) {
+            await reiheEinmalEin(
+              queues.publish,
+              "publish",
+              { tenantId, postId: post.id },
+              `publish-${post.id}`
+            );
+          }
+          if (due.length > 0) {
+            logger.info({ tenantId, count: due.length }, "due-posts: eingereiht");
+          }
+        });
 
-      case "ingest-tick": {
-        // Selbstheilend: alles Entdeckte einreihen (jobId dedupliziert).
-        const discovered = await db
-          .select({ id: sourceVideos.id })
-          .from(sourceVideos)
-          .where(eq(sourceVideos.status, "discovered"));
-        for (const source of discovered) {
-          await reiheEinmalEin(
-            queues.download,
-            "download",
-            { sourceVideoId: source.id },
-            `download-${source.id}`
-          );
-        }
+      case "ingest-tick":
+        return jeMandant("ingest-tick", async (db, tenantId) => {
+          // Selbstheilend: alles Entdeckte einreihen (jobId dedupliziert).
+          const discovered = await db
+            .select({ id: sourceVideos.id })
+            .from(sourceVideos)
+            .where(eq(sourceVideos.status, "discovered"))
+            .limit(MAX_JE_MANDANT_PRO_DURCHGANG);
+          for (const source of discovered) {
+            await reiheEinmalEin(
+              queues.download,
+              "download",
+              { tenantId, sourceVideoId: source.id },
+              `download-${source.id}`
+            );
+          }
 
-        // Importierte Clips ohne ffprobe-Daten validieren.
-        const unvalidated = await db
-          .select({ id: clips.id })
-          .from(clips)
-          .where(and(eq(clips.origin, "imported"), isNull(clips.endSeconds)));
-        for (const clip of unvalidated) {
-          await reiheEinmalEin(
-            queues.download,
-            "validate-import",
-            { clipId: clip.id },
-            `validate-${clip.id}`
-          );
-        }
+          // Importierte Clips ohne ffprobe-Daten validieren.
+          const unvalidated = await db
+            .select({ id: clips.id })
+            .from(clips)
+            .where(and(eq(clips.origin, "imported"), isNull(clips.endSeconds)))
+            .limit(MAX_JE_MANDANT_PRO_DURCHGANG);
+          for (const clip of unvalidated) {
+            await reiheEinmalEin(
+              queues.download,
+              "validate-import",
+              { tenantId, clipId: clip.id },
+              `validate-${clip.id}`
+            );
+          }
 
-        if (discovered.length + unvalidated.length > 0) {
-          logger.info(
-            { downloads: discovered.length, validations: unvalidated.length },
-            "ingest-tick: eingereiht"
-          );
-        }
-        break;
-      }
+          if (discovered.length + unvalidated.length > 0) {
+            logger.info(
+              { tenantId, downloads: discovered.length, validations: unvalidated.length },
+              "ingest-tick: eingereiht"
+            );
+          }
+        });
 
       default:
         logger.warn({ name: job.name }, "maintenance: unbekannter Job");
@@ -435,15 +508,18 @@ await queues.maintenance.add(
   {},
   { repeat: { pattern: "0 4 * * 1", tz: "Europe/Berlin" } } // montags 04:00
 );
-await queues.analytics.add(
-  "daily-analytics",
+// Die Tagesläufe hängen nicht mehr direkt am Takt: Der Fächer-Auftrag legt je
+// Mandant einen eigenen an. Ein Kunde mit kaputtem Konto reißt die Messung der
+// anderen damit nicht mit.
+await queues.maintenance.add(
+  "analytics-tick",
   {},
   { repeat: { pattern: "30 5 * * *", tz: "Europe/Berlin" } } // täglich 05:30
 );
-await queues.briefing.add(
-  "daily-briefing",
+await queues.maintenance.add(
+  "briefing-tick",
   {},
-  { repeat: { pattern: "0 6 * * *", tz: "Europe/Berlin" } } // täglich 06:00, nach Analytics
+  { repeat: { pattern: "0 6 * * *", tz: "Europe/Berlin" } } // täglich 06:00, nach der Messung
 );
 await queues.maintenance.add(
   "discovery-tick",

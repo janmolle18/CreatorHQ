@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { db, type DB } from "./client";
+import { db, reservierteVerbindung, type DB } from "./client";
 
 // Mandantengrenze — die wichtigste Sicherheitseigenschaft des Produkts.
 //
@@ -39,6 +39,43 @@ export async function withTenant<T>(
     await tx.execute(sql`select set_config('app.tenant_id', ${tenantId}, true)`);
     return fn(tx);
   });
+}
+
+/**
+ * Wie withTenant, aber OHNE Transaktion — für lang laufende Arbeit.
+ *
+ * Der Unterschied ist nicht kosmetisch. Ein Worker-Auftrag lädt herunter,
+ * rendert und lädt hoch; das dauert Minuten. Läge das in einer Transaktion,
+ * hätte das zwei Folgen, die beide beim ersten echten Lauf auffielen:
+ *
+ *   1. Ein Fehler am Ende rollt ALLES zurück — auch das `status: "failed"`,
+ *      das den Fehler festhalten soll. Der Auftrag scheitert dann unsichtbar
+ *      und der Datensatz sieht aus, als sei nie etwas passiert.
+ *   2. Postgres hielte eine Transaktion minutenlang offen. Das blockiert das
+ *      Aufräumen alter Zeilen und belegt die Verbindung ohne Not.
+ *
+ * Stattdessen: eine reservierte Verbindung, die Mandanten-Kennung auf
+ * Sitzungsebene gesetzt (`set_config(..., false)`), und am Ende ausdrücklich
+ * zurückgesetzt — sonst öffnete der nächste Griff aus dem Pool einen fremden
+ * Mandanten.
+ */
+export async function withTenantSession<T>(
+  tenantId: string,
+  fn: (db: DB) => Promise<T>
+): Promise<T> {
+  if (!UUID_MUSTER.test(tenantId)) {
+    throw new Error(`Ungültige Mandanten-Kennung: ${JSON.stringify(tenantId)}`);
+  }
+  const verbindung = await reservierteVerbindung();
+  try {
+    await verbindung.roh`select set_config('app.tenant_id', ${tenantId}, false)`;
+    return await fn(verbindung.db);
+  } finally {
+    // Auch wenn die Arbeit geworfen hat: Die Verbindung darf die Kennung nicht
+    // mit in den Pool zurücknehmen.
+    await verbindung.roh`select set_config('app.tenant_id', '', false)`.catch(() => {});
+    verbindung.freigeben();
+  }
 }
 
 /**

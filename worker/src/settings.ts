@@ -1,4 +1,4 @@
-import { db, settings } from "@creatorhq/db";
+import { settings, withTenantSession } from "@creatorhq/db";
 
 // Betriebsschalter aus der settings-Zeile. Bewusst bei jedem Aufruf frisch
 // gelesen und nicht zwischengespeichert: Wird der Schalter im Dashboard
@@ -13,9 +13,15 @@ import { db, settings } from "@creatorhq/db";
  * ohne Drosselung lüde sie binnen Minuten gleichzeitig hoch.
  *
  * Fehlt die settings-Zeile (frische Datenbank), gilt ebenfalls „aus" —
- * im Zweifel nicht posten.
+ * im Zweifel nicht posten. Der Schalter gilt je Mandant: Ein Creator, der
+ * seine Automatik anschaltet, schaltet sie nicht für alle anderen mit an.
  */
-export async function autoPublishEnabled(): Promise<boolean> {
-  const [config] = await db.select({ autoPublish: settings.autoPublish }).from(settings).limit(1);
-  return config?.autoPublish === true;
+export async function autoPublishEnabled(tenantId: string): Promise<boolean> {
+  return withTenantSession(tenantId, async (db) => {
+    const [config] = await db
+      .select({ autoPublish: settings.autoPublish })
+      .from(settings)
+      .limit(1);
+    return config?.autoPublish === true;
+  });
 }

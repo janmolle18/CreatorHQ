@@ -9,7 +9,10 @@ import { TMP_DIR } from "../integrations/storage.ts";
 
 const TMP_MAX_AGE_DAYS = 3;
 
-export async function processCleanup(): Promise<void> {
+// Der Arbeitsordner ist plattformweit — die Dateien darin tragen bereits die
+// Mandanten-Kennung im Namen. Das Handle wird nur entgegengenommen, damit die
+// Aufrufstelle einheitlich aussieht.
+export async function processCleanup(_db?: unknown): Promise<void> {
   const cutoff = Date.now() - TMP_MAX_AGE_DAYS * 86_400_000;
   const entries = await readdir(TMP_DIR, { withFileTypes: true }).catch(() => []);
   let removed = 0;

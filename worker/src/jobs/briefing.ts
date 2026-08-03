@@ -1,17 +1,20 @@
 import {
   briefings,
   comments,
-  db,
   ideas,
   metricsSnapshots,
   posts,
   settings,
   sourceVideos,
+  type DB,
 } from "@creatorhq/db";
 import { DEFAULT_TIMEZONE, todayInTz } from "@creatorhq/shared";
 import { and, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 import { env } from "../env.ts";
+import type { Job } from "bullmq";
 import { logger } from "../logger.ts";
+import { imAuftragsMandanten } from "../tenant.ts";
+import type { MandantenJob } from "../queues.ts";
 import { syncAllComments } from "../integrations/comments.ts";
 import {
   buildInputDigest,
@@ -32,7 +35,10 @@ const SYSTEM_PROMPT = `Du bist der Content-Stratege eines deutschen YouTube-Crea
 {"summaryMd": string, "contentIdeas": [{"title", "description", "targetPlatforms"?: string[]}], "replyCandidates": [{"commentId", "whyWorthIt", "replySketch"}], "brandRecommendations": [{"area", "finding", "action"}]}
 Regeln: Deutsch, konkret, keine Emojis. Werte videoPerformance aus, wenn vorhanden: benenne, welche Formate/Themen/Längen messbar besser laufen, und leite daraus die Ideen ab. Vergleiche Shorts NIE mit Langformat-Videos — die Views zählen unterschiedlich; vergleiche nur innerhalb einer Gruppe. summaryMd = 3-6 Sätze Lagebild in Markdown. 1-8 contentIdeas (umsetzbar als Kurzvideo). replyCandidates NUR mit commentId-Werten aus dem Digest — Kommentare wählen, die sich für ein Antwort-Video lohnen (max 5, leer erlaubt). 1-6 brandRecommendations zu Frequenz, Formaten, Bio, Cross-Links oder Nische. targetPlatforms nur aus: youtube, instagram, tiktok.`;
 
-async function gatherDigest(creatorName: string): Promise<Record<string, unknown>> {
+async function gatherDigest(
+  db: DB,
+  creatorName: string
+): Promise<Record<string, unknown>> {
   const sixtyDaysAgo = new Date(Date.now() - 60 * 86_400_000);
   const commentRows = await db
     .select()
@@ -173,26 +179,30 @@ async function callClaude(digest: Record<string, unknown>): Promise<string> {
   return data.content?.find((c) => c.type === "text")?.text ?? "";
 }
 
-export async function processBriefing(): Promise<void> {
+export async function processBriefing(job: Job<MandantenJob>): Promise<void> {
+  await imAuftragsMandanten(job, async (db, tenantId) => {
   const [config] = await db.select().from(settings).limit(1);
   const briefingDate = todayInTz(config?.timezone ?? DEFAULT_TIMEZONE);
-  const creatorName = config?.creatorName ?? "David";
+  const creatorName = config?.creatorName ?? "";
 
   await db
     .insert(briefings)
-    .values({ briefingDate, status: "running", model: env.anthropic.briefingModel })
+    .values({ tenantId, briefingDate, status: "running", model: env.anthropic.briefingModel })
+    // Ziel ist jetzt (tenant_id, briefing_date) — mit dem frueher global
+    // eindeutigen Datum haette es taeglich nur EIN Briefing im ganzen Produkt
+    // gegeben, und der zweite Mandant haette das des ersten ueberschrieben.
     .onConflictDoUpdate({
-      target: briefings.briefingDate,
+      target: [briefings.tenantId, briefings.briefingDate],
       set: { status: "running", error: null, updatedAt: new Date() },
     });
 
   try {
-    await syncAllComments();
+    await syncAllComments(tenantId);
   } catch (error) {
     logger.warn({ err: String(error) }, "briefing: Kommentar-Sync fehlgeschlagen — nutze Bestand");
   }
 
-  const digest = await gatherDigest(creatorName);
+  const digest = await gatherDigest(db, creatorName);
   await db
     .update(briefings)
     .set({ inputDigest: digest, updatedAt: new Date() })
@@ -256,4 +266,5 @@ export async function processBriefing(): Promise<void> {
       updatedAt: new Date(),
     })
     .where(eq(briefings.briefingDate, briefingDate));
+  });
 }

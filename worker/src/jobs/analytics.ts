@@ -1,17 +1,25 @@
 import {
-  db,
   metricsSnapshots,
   posts,
   settings,
   socialAccounts,
   sourceVideos,
   type SocialAccount,
+  type DB,
 } from "@creatorhq/db";
-import { chunkIds, DEFAULT_TIMEZONE, todayInTz, type PublishPlatform } from "@creatorhq/shared";
+import {
+  chunkIds,
+  DEFAULT_TIMEZONE,
+  todayInTz,
+  type PublishPlatform,
+} from "@creatorhq/shared";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { execa } from "execa";
 import { env } from "../env.ts";
+import type { Job } from "bullmq";
 import { logger } from "../logger.ts";
+import { imAuftragsMandanten } from "../tenant.ts";
+import type { MandantenJob } from "../queues.ts";
 import { fetchWithRetry } from "../integrations/http.ts";
 import {
   normalizeIgAccount,
@@ -31,13 +39,20 @@ import { withFreshToken } from "../integrations/tokens.ts";
 const YT_API = "https://www.googleapis.com/youtube/v3";
 const IG_GRAPH = "https://graph.instagram.com";
 
-async function getOrCreateAccount(platform: PublishPlatform): Promise<SocialAccount> {
+async function getOrCreateAccount(
+  db: DB,
+  tenantId: string,
+  platform: PublishPlatform,
+): Promise<SocialAccount> {
   const [existing] = await db
     .select()
     .from(socialAccounts)
     .where(eq(socialAccounts.platform, platform));
   if (existing) return existing;
-  await db.insert(socialAccounts).values({ platform }).onConflictDoNothing();
+  await db
+    .insert(socialAccounts)
+    .values({ tenantId, platform })
+    .onConflictDoNothing();
   const [created] = await db
     .select()
     .from(socialAccounts)
@@ -45,19 +60,24 @@ async function getOrCreateAccount(platform: PublishPlatform): Promise<SocialAcco
   return created!;
 }
 
-async function upsertSnapshot(input: {
-  snapshotDate: string;
-  platform: PublishPlatform;
-  accountId: string;
-  postId: string | null;
-  /** Gesetzt für Davids eigene Kanal-Videos (Referenz-Messung statt Post-Messung). */
-  sourceVideoId?: string | null;
-  metrics: SnapshotMetrics;
-}): Promise<void> {
+async function upsertSnapshot(
+  db: DB,
+  tenantId: string,
+  input: {
+    snapshotDate: string;
+    platform: PublishPlatform;
+    accountId: string;
+    postId: string | null;
+    /** Gesetzt für eigene Kanal-Videos (Referenz-Messung statt Post-Messung). */
+    sourceVideoId?: string | null;
+    metrics: SnapshotMetrics;
+  },
+): Promise<void> {
   if (Object.keys(input.metrics).length === 0) return;
   await db
     .insert(metricsSnapshots)
     .values({
+      tenantId,
       snapshotDate: input.snapshotDate,
       platform: input.platform,
       accountId: input.accountId,
@@ -85,25 +105,26 @@ async function upsertSnapshot(input: {
 async function fetchYoutubeStats(
   ids: readonly string[],
   authHeader: Record<string, string> | null,
-  keyParam: string
+  keyParam: string,
 ): Promise<Map<string, Record<string, unknown>>> {
   const byId = new Map<string, Record<string, unknown>>();
   for (const batch of chunkIds(ids)) {
     if (batch.length === 0) continue;
     const res = await fetchWithRetry(
       `${YT_API}/videos?part=statistics&id=${batch.join(",")}${keyParam}`,
-      authHeader ? { headers: authHeader } : {}
+      authHeader ? { headers: authHeader } : {},
     );
     const data = (await res.json()) as {
       items?: Array<{ id: string; statistics?: Record<string, unknown> }>;
     };
-    for (const item of data.items ?? []) byId.set(item.id, item.statistics ?? {});
+    for (const item of data.items ?? [])
+      byId.set(item.id, item.statistics ?? {});
   }
   return byId;
 }
 
 /** Veröffentlichte/übergebene Posts einer Plattform mit externer ID. */
-async function postsWithExternalId(platform: PublishPlatform) {
+async function postsWithExternalId(db: DB, platform: PublishPlatform) {
   return db
     .select({ id: posts.id, externalPostId: posts.externalPostId })
     .from(posts)
@@ -111,15 +132,20 @@ async function postsWithExternalId(platform: PublishPlatform) {
       and(
         eq(posts.platform, platform),
         isNotNull(posts.externalPostId),
-        inArray(posts.status, ["posted", "published"])
-      )
+        inArray(posts.status, ["posted", "published"]),
+      ),
     );
 }
 
 // ── YouTube: OAuth → API-Key → yt-dlp (keyless, echte Kanalzahlen) ──
-async function collectYoutube(snapshotDate: string): Promise<number> {
+async function collectYoutube(
+  db: DB,
+  tenantId: string,
+  snapshotDate: string,
+): Promise<number> {
   const [config] = await db.select().from(settings).limit(1);
-  const identifier = config?.youtubeChannelId || env.pipeline.defaultYoutubeHandle;
+  const identifier =
+    config?.youtubeChannelId || env.pipeline.defaultYoutubeHandle;
   const [connected] = await db
     .select()
     .from(socialAccounts)
@@ -132,20 +158,31 @@ async function collectYoutube(snapshotDate: string): Promise<number> {
   if (connected?.status === "connected") {
     const token = await withFreshToken(connected.id);
     authHeader = { Authorization: `Bearer ${token}` };
-    const res = await fetchWithRetry(`${YT_API}/channels?part=statistics&mine=true`, {
-      headers: authHeader,
-    });
-    const data = (await res.json()) as { items?: Array<{ statistics?: Record<string, unknown> }> };
-    channelMetrics = normalizeYoutubeChannelStats(data.items?.[0]?.statistics ?? {});
+    const res = await fetchWithRetry(
+      `${YT_API}/channels?part=statistics&mine=true`,
+      {
+        headers: authHeader,
+      },
+    );
+    const data = (await res.json()) as {
+      items?: Array<{ statistics?: Record<string, unknown> }>;
+    };
+    channelMetrics = normalizeYoutubeChannelStats(
+      data.items?.[0]?.statistics ?? {},
+    );
   } else if (env.youtube.apiKey) {
     const query = identifier.startsWith("UC")
       ? `id=${identifier}`
       : `forHandle=${encodeURIComponent(identifier.replace(/^@/, ""))}`;
     const res = await fetchWithRetry(
-      `${YT_API}/channels?part=statistics&${query}&key=${env.youtube.apiKey}`
+      `${YT_API}/channels?part=statistics&${query}&key=${env.youtube.apiKey}`,
     );
-    const data = (await res.json()) as { items?: Array<{ statistics?: Record<string, unknown> }> };
-    channelMetrics = normalizeYoutubeChannelStats(data.items?.[0]?.statistics ?? {});
+    const data = (await res.json()) as {
+      items?: Array<{ statistics?: Record<string, unknown> }>;
+    };
+    channelMetrics = normalizeYoutubeChannelStats(
+      data.items?.[0]?.statistics ?? {},
+    );
   } else {
     // Keyless: yt-dlp liest Follower + View-Counts des Videos-Tabs.
     const channelUrl = identifier.startsWith("UC")
@@ -160,8 +197,8 @@ async function collectYoutube(snapshotDate: string): Promise<number> {
     channelMetrics = normalizeYtdlpChannel(JSON.parse(stdout));
   }
 
-  const account = await getOrCreateAccount("youtube");
-  await upsertSnapshot({
+  const account = await getOrCreateAccount(db, tenantId, "youtube");
+  await upsertSnapshot(db, tenantId, {
     snapshotDate,
     platform: "youtube",
     accountId: account.id,
@@ -173,17 +210,17 @@ async function collectYoutube(snapshotDate: string): Promise<number> {
   // Post-Ebene: braucht API-Key oder OAuth (videos?part=statistics).
   const keyParam = env.youtube.apiKey ? `&key=${env.youtube.apiKey}` : "";
   if (authHeader || env.youtube.apiKey) {
-    const published = await postsWithExternalId("youtube");
+    const published = await postsWithExternalId(db, "youtube");
     if (published.length > 0) {
       const byId = await fetchYoutubeStats(
         published.map((post) => post.externalPostId!),
         authHeader,
-        keyParam
+        keyParam,
       );
       for (const post of published) {
         const stats = byId.get(post.externalPostId!);
         if (!stats) continue;
-        await upsertSnapshot({
+        await upsertSnapshot(db, tenantId, {
           snapshotDate,
           platform: "youtube",
           accountId: account.id,
@@ -205,12 +242,12 @@ async function collectYoutube(snapshotDate: string): Promise<number> {
       const byId = await fetchYoutubeStats(
         channelVideos.map((video) => video.externalId),
         authHeader,
-        keyParam
+        keyParam,
       );
       for (const video of channelVideos) {
         const stats = byId.get(video.externalId);
         if (!stats) continue;
-        await upsertSnapshot({
+        await upsertSnapshot(db, tenantId, {
           snapshotDate,
           platform: "youtube",
           accountId: account.id,
@@ -220,14 +257,21 @@ async function collectYoutube(snapshotDate: string): Promise<number> {
         });
         written += 1;
       }
-      logger.info({ videos: channelVideos.length }, "analytics: Kanal-Videos gemessen");
+      logger.info(
+        { videos: channelVideos.length },
+        "analytics: Kanal-Videos gemessen",
+      );
     }
   }
   return written;
 }
 
 // ── Instagram: nur mit verbundenem Account ──
-async function collectInstagram(snapshotDate: string): Promise<number> {
+async function collectInstagram(
+  db: DB,
+  tenantId: string,
+  snapshotDate: string,
+): Promise<number> {
   const [account] = await db
     .select()
     .from(socialAccounts)
@@ -240,10 +284,10 @@ async function collectInstagram(snapshotDate: string): Promise<number> {
   let written = 0;
 
   const meRes = await fetchWithRetry(
-    `${IG_GRAPH}/me?fields=followers_count&access_token=${token}`
+    `${IG_GRAPH}/me?fields=followers_count&access_token=${token}`,
   );
   const me = (await meRes.json()) as Record<string, unknown>;
-  await upsertSnapshot({
+  await upsertSnapshot(db, tenantId, {
     snapshotDate,
     platform: "instagram",
     accountId: account.id,
@@ -252,15 +296,15 @@ async function collectInstagram(snapshotDate: string): Promise<number> {
   });
   written += 1;
 
-  for (const post of await postsWithExternalId("instagram")) {
+  for (const post of await postsWithExternalId(db, "instagram")) {
     try {
       const res = await fetchWithRetry(
-        `${IG_GRAPH}/${post.externalPostId}/insights?metric=views,reach,likes,comments,shares,saved&access_token=${token}`
+        `${IG_GRAPH}/${post.externalPostId}/insights?metric=views,reach,likes,comments,shares,saved&access_token=${token}`,
       );
       const data = (await res.json()) as {
         data?: Array<{ name?: string; values?: Array<{ value?: unknown }> }>;
       };
-      await upsertSnapshot({
+      await upsertSnapshot(db, tenantId, {
         snapshotDate,
         platform: "instagram",
         accountId: account.id,
@@ -269,14 +313,21 @@ async function collectInstagram(snapshotDate: string): Promise<number> {
       });
       written += 1;
     } catch (error) {
-      logger.warn({ postId: post.id, err: String(error) }, "analytics: IG-Insights-Fehler");
+      logger.warn(
+        { postId: post.id, err: String(error) },
+        "analytics: IG-Insights-Fehler",
+      );
     }
   }
   return written;
 }
 
 // ── TikTok: video.list mit verbundenem Account ──
-async function collectTiktok(snapshotDate: string): Promise<number> {
+async function collectTiktok(
+  db: DB,
+  tenantId: string,
+  snapshotDate: string,
+): Promise<number> {
   const [account] = await db
     .select()
     .from(socialAccounts)
@@ -295,7 +346,7 @@ async function collectTiktok(snapshotDate: string): Promise<number> {
         "content-type": "application/json",
       },
       body: JSON.stringify({ max_count: 20 }),
-    }
+    },
   );
   const data = (await res.json()) as {
     data?: { videos?: Array<Record<string, unknown> & { id?: string }> };
@@ -304,10 +355,10 @@ async function collectTiktok(snapshotDate: string): Promise<number> {
   const byId = new Map(videos.map((v) => [String(v.id ?? ""), v]));
 
   let written = 0;
-  for (const post of await postsWithExternalId("tiktok")) {
+  for (const post of await postsWithExternalId(db, "tiktok")) {
     const video = byId.get(post.externalPostId!);
     if (!video) continue;
-    await upsertSnapshot({
+    await upsertSnapshot(db, tenantId, {
       snapshotDate,
       platform: "tiktok",
       accountId: account.id,
@@ -319,21 +370,29 @@ async function collectTiktok(snapshotDate: string): Promise<number> {
   return written;
 }
 
-export async function processAnalytics(): Promise<void> {
-  const [config] = await db.select().from(settings).limit(1);
-  const snapshotDate = todayInTz(config?.timezone ?? DEFAULT_TIMEZONE);
+export async function processAnalytics(job: Job<MandantenJob>): Promise<void> {
+  await imAuftragsMandanten(job, async (db, tenantId) => {
+    const [config] = await db.select().from(settings).limit(1);
+    const snapshotDate = todayInTz(config?.timezone ?? DEFAULT_TIMEZONE);
 
-  let total = 0;
-  for (const [name, collector] of [
-    ["youtube", collectYoutube],
-    ["instagram", collectInstagram],
-    ["tiktok", collectTiktok],
-  ] as const) {
-    try {
-      total += await collector(snapshotDate);
-    } catch (error) {
-      logger.warn({ platform: name, err: String(error) }, "analytics: Plattform fehlgeschlagen");
+    let total = 0;
+    for (const [name, collector] of [
+      ["youtube", collectYoutube],
+      ["instagram", collectInstagram],
+      ["tiktok", collectTiktok],
+    ] as const) {
+      try {
+        total += await collector(db, tenantId, snapshotDate);
+      } catch (error) {
+        logger.warn(
+          { platform: name, err: String(error) },
+          "analytics: Plattform fehlgeschlagen",
+        );
+      }
     }
-  }
-  logger.info({ snapshotDate, total }, "analytics: Snapshots geschrieben");
+    logger.info(
+      { tenantId, snapshotDate, total },
+      "analytics: Snapshots geschrieben",
+    );
+  });
 }

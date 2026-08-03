@@ -1,4 +1,11 @@
-import { comments, db, posts, socialAccounts, sourceVideos } from "@creatorhq/db";
+import {
+  comments,
+  posts,
+  socialAccounts,
+  sourceVideos,
+  withTenantSession,
+  type DB,
+} from "@creatorhq/db";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { execa } from "execa";
 import { env } from "../env.ts";
@@ -27,13 +34,17 @@ interface UpsertComment {
   raw?: Record<string, unknown>;
 }
 
-async function upsertComment(entry: UpsertComment): Promise<void> {
+async function upsertComment(
+  db: DB,
+  tenantId: string,
+  entry: UpsertComment
+): Promise<void> {
   if (!entry.text.trim()) return;
   await db
     .insert(comments)
-    .values(entry)
+    .values({ tenantId, ...entry })
     .onConflictDoUpdate({
-      target: [comments.platform, comments.externalCommentId],
+      target: [comments.tenantId, comments.platform, comments.externalCommentId],
       set: {
         likeCount: entry.likeCount,
         replyCount: entry.replyCount,
@@ -45,9 +56,9 @@ async function upsertComment(entry: UpsertComment): Promise<void> {
 }
 
 /** Alle bekannten YouTube-Videos: Quellvideos + veröffentlichte Posts. */
-async function knownYoutubeVideos(): Promise<
-  Array<{ videoId: string; postId: string | null }>
-> {
+async function knownYoutubeVideos(
+  db: DB
+): Promise<Array<{ videoId: string; postId: string | null }>> {
   const sources = await db
     .select({ externalId: sourceVideos.externalId })
     .from(sourceVideos)
@@ -155,8 +166,8 @@ async function fetchViaYtdlp(videoId: string): Promise<Omit<UpsertComment, "post
     }));
 }
 
-export async function syncYoutubeComments(): Promise<number> {
-  const videos = await knownYoutubeVideos();
+export async function syncYoutubeComments(db: DB, tenantId: string): Promise<number> {
+  const videos = await knownYoutubeVideos(db);
   let written = 0;
   for (const video of videos) {
     try {
@@ -164,7 +175,7 @@ export async function syncYoutubeComments(): Promise<number> {
         ? await fetchViaApi(video.videoId)
         : await fetchViaYtdlp(video.videoId);
       for (const entry of entries) {
-        await upsertComment({ ...entry, postId: video.postId });
+        await upsertComment(db, tenantId, { ...entry, postId: video.postId });
         written += 1;
       }
     } catch (error) {
@@ -181,7 +192,7 @@ export async function syncYoutubeComments(): Promise<number> {
   return written;
 }
 
-export async function syncInstagramComments(): Promise<number> {
+export async function syncInstagramComments(db: DB, tenantId: string): Promise<number> {
   const [account] = await db
     .select()
     .from(socialAccounts)
@@ -222,7 +233,7 @@ export async function syncInstagramComments(): Promise<number> {
       };
       for (const comment of data.data ?? []) {
         if (!comment.id) continue;
-        await upsertComment({
+        await upsertComment(db, tenantId, {
           platform: "instagram",
           postId: post.id,
           externalVideoId: post.externalPostId!,
@@ -242,8 +253,12 @@ export async function syncInstagramComments(): Promise<number> {
   return written;
 }
 
-export async function syncAllComments(): Promise<{ youtube: number; instagram: number }> {
-  const youtube = await syncYoutubeComments();
-  const instagram = await syncInstagramComments();
-  return { youtube, instagram };
+export async function syncAllComments(
+  tenantId: string
+): Promise<{ youtube: number; instagram: number }> {
+  return withTenantSession(tenantId, async (db) => {
+    const youtube = await syncYoutubeComments(db, tenantId);
+    const instagram = await syncInstagramComments(db, tenantId);
+    return { youtube, instagram };
+  });
 }

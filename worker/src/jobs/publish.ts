@@ -1,4 +1,11 @@
-import { db, clips, posts, settings, socialAccounts, type Post } from "@creatorhq/db";
+import {
+  clips,
+  posts,
+  settings,
+  socialAccounts,
+  type Post,
+  type DB,
+} from "@creatorhq/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Job } from "bullmq";
 import { execa } from "execa";
@@ -21,6 +28,7 @@ import {
 import { downloadKeyToTmp } from "../integrations/storage.ts";
 import { uploadVideo as uploadTiktokVideo } from "../integrations/tiktok.ts";
 import { withFreshToken } from "../integrations/tokens.ts";
+import { imAuftragsMandanten } from "../tenant.ts";
 import {
   buildVideoMetadata,
   uploadVideo as uploadYoutubeVideo,
@@ -35,11 +43,16 @@ const ASPECT_TOLERANCE = 0.02;
 /** ffprobe-Validierung vor dem IG-Publish (Dauer + Seitenverhältnis). */
 async function validateForReel(localPath: string): Promise<string | null> {
   const { stdout } = await execa("ffprobe", [
-    "-v", "error",
-    "-select_streams", "v:0",
-    "-show_entries", "stream=width,height",
-    "-show_entries", "format=duration",
-    "-of", "json",
+    "-v",
+    "error",
+    "-select_streams",
+    "v:0",
+    "-show_entries",
+    "stream=width,height",
+    "-show_entries",
+    "format=duration",
+    "-of",
+    "json",
     localPath,
   ]);
   const probe = JSON.parse(stdout) as {
@@ -71,10 +84,18 @@ function buildCaption(caption: string | null, hashtags: string[]): string {
   return [caption ?? "", tags].filter(Boolean).join("\n\n").trim();
 }
 
-async function fallbackToManual(postId: string, reason: string): Promise<void> {
+async function fallbackToManual(
+  db: DB,
+  postId: string,
+  reason: string,
+): Promise<void> {
   await db
     .update(posts)
-    .set({ status: "awaiting_manual", error: reason.slice(0, 300), updatedAt: new Date() })
+    .set({
+      status: "awaiting_manual",
+      error: reason.slice(0, 300),
+      updatedAt: new Date(),
+    })
     .where(eq(posts.id, postId));
 }
 
@@ -83,16 +104,18 @@ async function fallbackToManual(postId: string, reason: string): Promise<void> {
  *
  * Die Planung schreibt in `accountId` die ID des Kontos, das es zum
  * Planungszeitpunkt gab; existierte damals keins, bleibt die Spalte leer
- * (`worker/src/jobs/schedule.ts`). Von den wartenden Posts trifft das alle
- * zehn Instagram-Zeilen: Sie wären auch nach Davids Verbindung dauerhaft im
- * Handbetrieb geblieben, ohne dass irgendwo ein Fehler sichtbar wird.
+ * (`worker/src/jobs/schedule.ts`). Solche Posts blieben auch NACH dem Verbinden
+ * dauerhaft im Handbetrieb, ohne dass irgendwo ein Fehler sichtbar wird.
  *
- * Da `social_accounts.platform` eindeutig ist, gibt es je Plattform genau ein
- * Konto — die Auflösung über die Plattform ist deshalb immer richtig und
+ * Da (tenant_id, platform) eindeutig ist, gibt es je Mandant und Plattform
+ * genau ein Konto — die Auflösung über die Plattform ist deshalb immer richtig und
  * heilt Altbestand von selbst. Die gefundene ID wird zurückgeschrieben, damit
  * die Spalte mit der Zeit stimmt.
  */
-async function verbundenesKonto(post: Post): Promise<string | null> {
+async function verbundenesKonto(
+  db: DB,
+  post: Post,
+): Promise<string | null> {
   const [konto] = await db
     .select({ id: socialAccounts.id, status: socialAccounts.status })
     .from(socialAccounts)
@@ -109,17 +132,22 @@ async function verbundenesKonto(post: Post): Promise<string | null> {
   return konto.id;
 }
 
-async function publishTiktok(post: Post, caption: string): Promise<void> {
+async function publishTiktok(
+  db: DB,
+  post: Post,
+  caption: string,
+): Promise<void> {
   if (!env.tiktok.clientKey || !env.tiktok.clientSecret) {
     await fallbackToManual(
+      db,
       post.id,
-      "TikTok ist noch nicht eingerichtet — bitte selbst posten"
+      "TikTok ist noch nicht eingerichtet — bitte selbst posten",
     );
     return;
   }
-  const accountId = await verbundenesKonto(post);
+  const accountId = await verbundenesKonto(db, post);
   if (!accountId) {
-    await fallbackToManual(post.id, "Kein TikTok-Account verbunden");
+    await fallbackToManual(db, post.id, "Kein TikTok-Account verbunden");
     return;
   }
 
@@ -129,7 +157,10 @@ async function publishTiktok(post: Post, caption: string): Promise<void> {
   let localPath: string | null = null;
   try {
     const accessToken = await withFreshToken(accountId);
-    localPath = await downloadKeyToTmp(clip.renderedPath, `publish-${post.id}.mp4`);
+    localPath = await downloadKeyToTmp(
+      clip.renderedPath,
+      `publish-${post.id}.mp4`,
+    );
     const { publishId } = await uploadTiktokVideo({
       accessToken,
       filePath: localPath,
@@ -150,8 +181,9 @@ async function publishTiktok(post: Post, caption: string): Promise<void> {
   } catch (error) {
     if (error instanceof TokenExpiredError) {
       await fallbackToManual(
+        db,
         post.id,
-        "TikTok-Verbindung abgelaufen — unter Accounts neu verbinden, dann manuell posten"
+        "TikTok-Verbindung abgelaufen — unter Accounts neu verbinden, dann manuell posten",
       );
       return;
     }
@@ -161,17 +193,18 @@ async function publishTiktok(post: Post, caption: string): Promise<void> {
   }
 }
 
-async function publishYoutube(post: Post): Promise<void> {
+async function publishYoutube(db: DB, post: Post): Promise<void> {
   if (!env.google.clientId || !env.google.clientSecret) {
     await fallbackToManual(
+      db,
       post.id,
-      "YouTube ist noch nicht eingerichtet — bitte selbst posten"
+      "YouTube ist noch nicht eingerichtet — bitte selbst posten",
     );
     return;
   }
-  const accountId = await verbundenesKonto(post);
+  const accountId = await verbundenesKonto(db, post);
   if (!accountId) {
-    await fallbackToManual(post.id, "Kein YouTube-Account verbunden");
+    await fallbackToManual(db, post.id, "Kein YouTube-Account verbunden");
     return;
   }
 
@@ -182,7 +215,10 @@ async function publishYoutube(post: Post): Promise<void> {
   let localPath: string | null = null;
   try {
     const accessToken = await withFreshToken(accountId);
-    localPath = await downloadKeyToTmp(clip.renderedPath, `publish-${post.id}.mp4`);
+    localPath = await downloadKeyToTmp(
+      clip.renderedPath,
+      `publish-${post.id}.mp4`,
+    );
     const metadata = buildVideoMetadata({
       title: clip.title,
       caption: post.captionOverride ?? clip.caption,
@@ -217,8 +253,9 @@ async function publishYoutube(post: Post): Promise<void> {
   } catch (error) {
     if (error instanceof TokenExpiredError) {
       await fallbackToManual(
+        db,
         post.id,
-        "YouTube-Verbindung abgelaufen — unter Accounts neu verbinden, dann manuell posten"
+        "YouTube-Verbindung abgelaufen — unter Accounts neu verbinden, dann manuell posten",
       );
       return;
     }
@@ -228,23 +265,29 @@ async function publishYoutube(post: Post): Promise<void> {
   }
 }
 
-async function publishInstagram(post: Post, caption: string): Promise<void> {
+async function publishInstagram(
+  db: DB,
+  post: Post,
+  caption: string,
+): Promise<void> {
   if (!env.instagram.appId || !env.instagram.appSecret) {
     await fallbackToManual(
+      db,
       post.id,
-      "Instagram ist noch nicht eingerichtet — bitte selbst posten"
+      "Instagram ist noch nicht eingerichtet — bitte selbst posten",
     );
     return;
   }
-  const accountId = await verbundenesKonto(post);
+  const accountId = await verbundenesKonto(db, post);
   if (!accountId) {
-    await fallbackToManual(post.id, "Kein Instagram-Account verbunden");
+    await fallbackToManual(db, post.id, "Kein Instagram-Account verbunden");
     return;
   }
   if (!isPublicMediaAvailable()) {
     await fallbackToManual(
+      db,
       post.id,
-      "Instagram braucht noch eine feste Adresse von Jan — bitte selbst posten"
+      "Instagram braucht noch eine feste Adresse von Jan — bitte selbst posten",
     );
     return;
   }
@@ -258,17 +301,28 @@ async function publishInstagram(post: Post, caption: string): Promise<void> {
     .where(eq(socialAccounts.id, accountId));
   const igUserId = account?.authMeta?.igUserId;
   if (!igUserId) {
-    await fallbackToManual(post.id, "Instagram-User-ID fehlt — Account neu verbinden");
+    await fallbackToManual(
+      db,
+      post.id,
+      "Instagram-User-ID fehlt — Account neu verbinden",
+    );
     return;
   }
 
   let localPath: string | null = null;
   try {
     // ffprobe-Validierung VOR dem Publish (Reel-Regeln).
-    localPath = await downloadKeyToTmp(clip.renderedPath, `publish-${post.id}.mp4`);
+    localPath = await downloadKeyToTmp(
+      clip.renderedPath,
+      `publish-${post.id}.mp4`,
+    );
     const validationError = await validateForReel(localPath);
     if (validationError) {
-      await fallbackToManual(post.id, `Reel-Validierung: ${validationError}`);
+      await fallbackToManual(
+        db,
+        post.id,
+        `Reel-Validierung: ${validationError}`,
+      );
       return;
     }
 
@@ -281,7 +335,11 @@ async function publishInstagram(post: Post, caption: string): Promise<void> {
       caption,
     });
     await waitForContainer(containerId, accessToken);
-    const mediaId = await publishContainer({ igUserId, accessToken, containerId });
+    const mediaId = await publishContainer({
+      igUserId,
+      accessToken,
+      containerId,
+    });
     const permalink = await fetchPermalink(mediaId, accessToken);
 
     await db
@@ -295,12 +353,16 @@ async function publishInstagram(post: Post, caption: string): Promise<void> {
         updatedAt: new Date(),
       })
       .where(eq(posts.id, post.id));
-    logger.info({ postId: post.id, mediaId }, "publish: Instagram-Reel veröffentlicht");
+    logger.info(
+      { postId: post.id, mediaId },
+      "publish: Instagram-Reel veröffentlicht",
+    );
   } catch (error) {
     if (error instanceof TokenExpiredError) {
       await fallbackToManual(
+        db,
         post.id,
-        "Instagram-Verbindung abgelaufen — unter Accounts neu verbinden, dann manuell posten"
+        "Instagram-Verbindung abgelaufen — unter Accounts neu verbinden, dann manuell posten",
       );
       return;
     }
@@ -312,93 +374,118 @@ async function publishInstagram(post: Post, caption: string): Promise<void> {
 
 export async function processPublish(job: Job<PostJob>): Promise<void> {
   const { postId, manual } = job.data;
-
-  // Zweite Sperre hinter dem Tick: Ein Job, der vor dem Ausschalten in die
-  // Queue kam, darf danach nicht doch noch hochladen. Von Hand ausgelöste
-  // Jobs sind ausgenommen — dort hat ein Mensch bewusst geklickt.
-  if (!manual && !(await autoPublishEnabled())) {
-    logger.info({ postId }, "publish: übersprungen — automatisches Posten ist aus");
-    return;
-  }
-
-  // Atomarer Anspruch statt Lesen → Prüfen → Schreiben.
-  //
-  // Vorher konnten zwei Jobs denselben Post greifen: der Minuten-Tick und
-  // „Jetzt posten" reihen unter verschiedenen Job-IDs ein, die Queue läuft mit
-  // Nebenläufigkeit 2 — beide lasen „scheduled", bevor einer „uploading"
-  // schrieb, und dasselbe Video ging doppelt raus.
-  //
-  // `uploading` ist bewusst mit im WHERE: Stirbt der Worker mitten im Upload,
-  // liefert BullMQ den Job erneut aus. Ein Guard, der nur „scheduled" gelten
-  // lässt, hätte den Job dann als *erfolgreich* beendet und den Post für immer
-  // in „wird hochgeladen" stehen lassen — kein Sweep holt ihn dort heraus.
-  const [post] = await db
-    .update(posts)
-    .set({ status: "uploading", attemptCount: sql`${posts.attemptCount} + 1`, updatedAt: new Date() })
-    .where(and(eq(posts.id, postId), inArray(posts.status, ["scheduled", "uploading"])))
-    .returning();
-
-  if (!post) {
-    logger.info({ postId }, "publish: übersprungen — ein anderer Lauf war schneller");
-    return;
-  }
-
-  // Bereits auf der Plattform? Dann war der Upload vor dem Absturz erfolgreich —
-  // ein zweiter Versuch würde ein Duplikat erzeugen.
-  if (post.externalPostId) {
-    logger.warn(
-      { postId, externalPostId: post.externalPostId },
-      "publish: schon hochgeladen — kein zweiter Versuch"
-    );
-    await fallbackToManual(
-      postId,
-      "War bereits hochgeladen, als der Vorgang abbrach — bitte auf der Plattform nachsehen"
-    );
-    return;
-  }
-
-  const [clip] = await db.select().from(clips).where(eq(clips.id, post.clipId));
-  const caption = buildCaption(
-    post.captionOverride ?? clip?.caption ?? null,
-    clip?.hashtags ?? []
-  );
-
-  try {
-    switch (post.platform) {
-      case "tiktok":
-        await publishTiktok(post, caption);
-        break;
-      case "youtube":
-        await publishYoutube(post);
-        break;
-      case "instagram":
-        await publishInstagram(post, caption);
-        break;
-      default:
-        await fallbackToManual(postId, `Unbekannte Plattform ${post.platform}`);
+  await imAuftragsMandanten(job, async (db, tenantId) => {
+    // Zweite Sperre hinter dem Tick: Ein Job, der vor dem Ausschalten in die
+    // Queue kam, darf danach nicht doch noch hochladen. Von Hand ausgelöste
+    // Jobs sind ausgenommen — dort hat ein Mensch bewusst geklickt.
+    if (!manual && !(await autoPublishEnabled(tenantId))) {
+      logger.info(
+        { postId },
+        "publish: übersprungen — automatisches Posten ist aus",
+      );
+      return;
     }
-  } catch (error) {
-    const message = error instanceof Error ? error.message.slice(0, 300) : String(error);
-    logger.error({ err: error, postId }, "publish: fehlgeschlagen");
-    await db
+
+    // Atomarer Anspruch statt Lesen → Prüfen → Schreiben.
+    //
+    // Vorher konnten zwei Jobs denselben Post greifen: der Minuten-Tick und
+    // „Jetzt posten" reihen unter verschiedenen Job-IDs ein, die Queue läuft mit
+    // Nebenläufigkeit 2 — beide lasen „scheduled", bevor einer „uploading"
+    // schrieb, und dasselbe Video ging doppelt raus.
+    //
+    // `uploading` ist bewusst mit im WHERE: Stirbt der Worker mitten im Upload,
+    // liefert BullMQ den Job erneut aus. Ein Guard, der nur „scheduled" gelten
+    // lässt, hätte den Job dann als *erfolgreich* beendet und den Post für immer
+    // in „wird hochgeladen" stehen lassen — kein Sweep holt ihn dort heraus.
+    const [post] = await db
       .update(posts)
       .set({
-        // Nach 3 Versuchen bleibt der Post via Fallback abwickelbar.
-        // `post` kommt aus dem RETURNING nach der Erhöhung — der Zähler steht
-        // hier also schon auf dem Wert DIESES Versuchs, kein +1 mehr.
-        status: post.attemptCount >= 3 ? "awaiting_manual" : "scheduled",
-        error: message,
+        status: "uploading",
+        attemptCount: sql`${posts.attemptCount} + 1`,
         updatedAt: new Date(),
       })
-      .where(eq(posts.id, postId));
-    throw error;
-  }
+      .where(
+        and(
+          eq(posts.id, postId),
+          inArray(posts.status, ["scheduled", "uploading"]),
+        ),
+      )
+      .returning();
 
-  // Verbindungs-Hinweis am Account pflegen, falls vorhanden.
-  if (post.accountId) {
-    await db
-      .update(socialAccounts)
-      .set({ updatedAt: new Date() })
-      .where(eq(socialAccounts.id, post.accountId));
-  }
+    if (!post) {
+      logger.info(
+        { postId },
+        "publish: übersprungen — ein anderer Lauf war schneller",
+      );
+      return;
+    }
+
+    // Bereits auf der Plattform? Dann war der Upload vor dem Absturz erfolgreich —
+    // ein zweiter Versuch würde ein Duplikat erzeugen.
+    if (post.externalPostId) {
+      logger.warn(
+        { postId, externalPostId: post.externalPostId },
+        "publish: schon hochgeladen — kein zweiter Versuch",
+      );
+      await fallbackToManual(
+        db,
+        postId,
+        "War bereits hochgeladen, als der Vorgang abbrach — bitte auf der Plattform nachsehen",
+      );
+      return;
+    }
+
+    const [clip] = await db
+      .select()
+      .from(clips)
+      .where(eq(clips.id, post.clipId));
+    const caption = buildCaption(
+      post.captionOverride ?? clip?.caption ?? null,
+      clip?.hashtags ?? [],
+    );
+
+    try {
+      switch (post.platform) {
+        case "tiktok":
+          await publishTiktok(db, post, caption);
+          break;
+        case "youtube":
+          await publishYoutube(db, post);
+          break;
+        case "instagram":
+          await publishInstagram(db, post, caption);
+          break;
+        default:
+          await fallbackToManual(
+            db,
+            postId,
+            `Unbekannte Plattform ${post.platform}`,
+          );
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message.slice(0, 300) : String(error);
+      logger.error({ err: error, postId }, "publish: fehlgeschlagen");
+      await db
+        .update(posts)
+        .set({
+          // Nach 3 Versuchen bleibt der Post via Fallback abwickelbar.
+          // `post` kommt aus dem RETURNING nach der Erhöhung — der Zähler steht
+          // hier also schon auf dem Wert DIESES Versuchs, kein +1 mehr.
+          status: post.attemptCount >= 3 ? "awaiting_manual" : "scheduled",
+          error: message,
+          updatedAt: new Date(),
+        })
+        .where(eq(posts.id, postId));
+      throw error;
+    }
+
+    // Verbindungs-Hinweis am Account pflegen, falls vorhanden.
+    if (post.accountId) {
+      await db
+        .update(socialAccounts)
+        .set({ updatedAt: new Date() })
+        .where(eq(socialAccounts.id, post.accountId));
+    }
+  });
 }

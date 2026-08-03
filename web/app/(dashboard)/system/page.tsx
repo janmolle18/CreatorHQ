@@ -66,7 +66,7 @@ export default async function SystemPage() {
     queueDepths(),
     backupInfo(),
     zugangInfo(),
-    speicherPosten(),
+    speicherPosten(session.tenantId),
     nachziehPlan(session.tenantId),
   ]);
 

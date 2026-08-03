@@ -22,13 +22,20 @@ export const QUEUE = {
 export type QueueName = (typeof QUEUE)[keyof typeof QUEUE];
 
 // ── Job-Payloads ──
-export interface SourceVideoJob {
+//
+// JEDER Auftrag trägt den Mandanten. Ohne ihn kann der Worker die
+// Mandantengrenze nicht setzen, und die Datenbankregeln liefern ihm null
+// Zeilen — der Auftrag meldete Erfolg, ohne etwas getan zu haben.
+export interface MandantenJob {
+  tenantId: string;
+}
+export interface SourceVideoJob extends MandantenJob {
   sourceVideoId: string;
 }
-export interface ClipJob {
+export interface ClipJob extends MandantenJob {
   clipId: string;
 }
-export interface PostJob {
+export interface PostJob extends MandantenJob {
   postId: string;
   /**
    * Von Hand ausgelöst („Jetzt posten" im Dashboard). Solche Jobs laufen auch
@@ -54,9 +61,9 @@ export const queues = {
   clip: makeQueue<SourceVideoJob | ClipJob>(QUEUE.clip),
   render: makeQueue<ClipJob>(QUEUE.render),
   publish: makeQueue<PostJob>(QUEUE.publish),
-  analytics: makeQueue<Record<string, never>>(QUEUE.analytics),
-  comments: makeQueue<Record<string, never>>(QUEUE.comments),
-  briefing: makeQueue<Record<string, never>>(QUEUE.briefing),
+  analytics: makeQueue<MandantenJob>(QUEUE.analytics),
+  comments: makeQueue<MandantenJob>(QUEUE.comments),
+  briefing: makeQueue<MandantenJob>(QUEUE.briefing),
   maintenance: makeQueue<Record<string, unknown>>(QUEUE.maintenance),
 };
 
@@ -89,7 +96,15 @@ export async function reiheEinmalEin<TData, TName extends string>(
   }
   // BullMQs `ExtractNameType` lässt sich in einer generischen Funktion nicht
   // auflösen; die Signatur oben sichert Name und Daten an den Aufrufstellen
-  // bereits ab, deshalb hier eine eng begrenzte Typangabe für `add`.
-  const add = queue.add as (n: TName, d: TData, o: { jobId: string }) => Promise<unknown>;
-  await add(name, data, { jobId });
+  // bereits ab, deshalb hier eine eng begrenzte Typangabe.
+  //
+  // Umgetypt wird die QUEUE, nicht die Methode. Wer stattdessen
+  // `const add = queue.add` schreibt, löst die Methode von ihrem Objekt: In
+  // `add` ist `this` dann undefined, und BullMQs erste Zeile (`this.trace(…)`)
+  // wirft. Sichtbar wird das nur, wenn wirklich etwas eingereiht werden soll —
+  // ein Takt ohne Arbeit sieht genauso aus wie ein kaputter.
+  const eingang = queue as unknown as {
+    add(n: TName, d: TData, o: { jobId: string }): Promise<unknown>;
+  };
+  await eingang.add(name, data, { jobId });
 }

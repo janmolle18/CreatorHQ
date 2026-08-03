@@ -1,4 +1,4 @@
-import { db, sourceVideos } from "@creatorhq/db";
+import { sourceVideos, type DB } from "@creatorhq/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../logger.ts";
 import { deleteObject } from "../integrations/storage.ts";
@@ -11,11 +11,14 @@ import { deleteObject } from "../integrations/storage.ts";
  * Clip-Job). Vorher gab jeder Weg die Quelldatei unterschiedlich frei, wodurch
  * verwaiste Dateien liegen blieben.
  */
-export async function markSourceAsReference(input: {
-  sourceVideoId: string;
-  storagePath: string | null;
-  reason: string;
-}): Promise<void> {
+export async function markSourceAsReference(
+  db: DB,
+  input: {
+    sourceVideoId: string;
+    storagePath: string | null;
+    reason: string;
+  }
+): Promise<void> {
   if (input.storagePath) await deleteObject(input.storagePath);
 
   await db
