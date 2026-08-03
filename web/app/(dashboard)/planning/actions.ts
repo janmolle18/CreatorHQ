@@ -11,7 +11,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireSession } from "@/lib/auth";
+import { mitMandant } from "@/lib/auth";
 
 const IDEA_STATUSES = ["idea", "planned", "in_production", "published", "discarded"] as const;
 
@@ -22,7 +22,6 @@ const newIdeaSchema = z.object({
 });
 
 export async function createIdeaAction(formData: FormData): Promise<void> {
-  await requireSession();
   const parsed = newIdeaSchema.safeParse({
     title: formData.get("title") ?? "",
     description: formData.get("description") ?? "",
@@ -35,27 +34,33 @@ export async function createIdeaAction(formData: FormData): Promise<void> {
     );
   }
 
-  await db.insert(ideas).values({
-    title: parsed.data.title,
-    description: parsed.data.description || null,
-    targetPlatforms: parsed.data.targetPlatforms,
-    status: "idea",
-    source: "manual",
-  });
+  await mitMandant((tx, session) =>
+    tx.insert(ideas).values({
+      tenantId: session.tenantId,
+      title: parsed.data.title,
+      description: parsed.data.description || null,
+      targetPlatforms: parsed.data.targetPlatforms,
+      status: "idea",
+      source: "manual",
+    })
+  );
   revalidatePath("/planning");
   redirect("/planning?created=1");
 }
 
 export async function setIdeaStatusAction(formData: FormData): Promise<void> {
-  await requireSession();
   const ideaId = String(formData.get("ideaId") ?? "");
   const status = String(formData.get("status") ?? "");
   if (!ideaId || !(IDEA_STATUSES as readonly string[]).includes(status)) return;
 
-  await db
-    .update(ideas)
-    .set({ status: status as (typeof IDEA_STATUSES)[number], updatedAt: new Date() })
-    .where(eq(ideas.id, ideaId));
+  // Kein zusaetzliches WHERE auf den Mandanten noetig: Gehoert die Idee einem
+  // anderen Creator, sieht die Datenbank sie hier gar nicht.
+  await mitMandant((tx) =>
+    tx
+      .update(ideas)
+      .set({ status: status as (typeof IDEA_STATUSES)[number], updatedAt: new Date() })
+      .where(eq(ideas.id, ideaId))
+  );
   revalidatePath("/planning");
   revalidatePath("/calendar");
 }
@@ -67,7 +72,6 @@ const shootSchema = z.object({
 
 /** Aus einer Idee einen Dreh-Termin im Kalender anlegen. */
 export async function scheduleShootAction(formData: FormData): Promise<void> {
-  await requireSession();
   const ideaId = String(formData.get("ideaId") ?? "");
   if (!ideaId) return;
 
@@ -82,23 +86,30 @@ export async function scheduleShootAction(formData: FormData): Promise<void> {
     );
   }
 
-  const [idea] = await db.select().from(ideas).where(eq(ideas.id, ideaId));
-  if (!idea) return;
-  const [config] = await db.select().from(settings).limit(1);
-  const timeZone = config?.timezone ?? DEFAULT_TIMEZONE;
+  // Ein Durchgang statt drei: Lesen, Anlegen und Umstellen gehoeren zusammen —
+  // bricht etwas ab, steht kein Termin ohne umgestellte Idee im Kalender.
+  const angelegt = await mitMandant(async (tx, session) => {
+    const [idea] = await tx.select().from(ideas).where(eq(ideas.id, ideaId));
+    if (!idea) return false;
+    const [config] = await tx.select().from(settings).limit(1);
+    const timeZone = config?.timezone ?? DEFAULT_TIMEZONE;
 
-  await db.insert(calendarItems).values({
-    kind: "shoot",
-    title: `Dreh: ${idea.title}`,
-    ideaId,
-    startsAt: slotToUtc(parsed.data.date, parsed.data.time, timeZone),
-    allDay: false,
+    await tx.insert(calendarItems).values({
+      tenantId: session.tenantId,
+      kind: "shoot",
+      title: `Dreh: ${idea.title}`,
+      ideaId,
+      startsAt: slotToUtc(parsed.data.date, parsed.data.time, timeZone),
+      allDay: false,
+    });
+    // Idee gilt ab jetzt als geplant.
+    await tx
+      .update(ideas)
+      .set({ status: "planned", updatedAt: new Date() })
+      .where(eq(ideas.id, ideaId));
+    return true;
   });
-  // Idee gilt ab jetzt als geplant.
-  await db
-    .update(ideas)
-    .set({ status: "planned", updatedAt: new Date() })
-    .where(eq(ideas.id, ideaId));
+  if (!angelegt) return;
 
   revalidatePath("/planning");
   revalidatePath("/calendar");

@@ -1,13 +1,14 @@
 import {
   briefings,
   clips,
-  db,
   metricsSnapshots,
   posts,
   settings,
   sourceVideos,
+  withTenant,
 } from "@creatorhq/db";
 import { and, desc, eq, isNotNull, lte, sql } from "drizzle-orm";
+import { requireSession } from "@/lib/auth";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Flash } from "@/components/flash";
@@ -56,31 +57,32 @@ function Zeile({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default async function SystemPage() {
-  const [
-    infra,
-    queues,
-    backup,
-    zugang,
-    speicher,
-    letzteMessung,
-    briefingZeilen,
-    fehler,
-    konfig,
-    wartend,
-    nachziehen,
-  ] = await Promise.all([
-      checkInfra(),
-      queueDepths(),
-      backupInfo(),
-      zugangInfo(),
-      speicherPosten(),
-      db
-        .select({ capturedAt: metricsSnapshots.capturedAt })
-        .from(metricsSnapshots)
-        .orderBy(desc(metricsSnapshots.capturedAt))
-        .limit(1),
-      db.select().from(briefings).orderBy(desc(briefings.briefingDate)).limit(1),
-      db.execute(sql`
+  const session = await requireSession();
+
+  // Betriebsdaten (Container, Warteschlangen, Speicher) sind plattformweit und
+  // brauchen keine Mandantengrenze; die Datenbankabfragen darunter schon.
+  const [infra, queues, backup, zugang, speicher, nachziehen] = await Promise.all([
+    checkInfra(),
+    queueDepths(),
+    backupInfo(),
+    zugangInfo(),
+    speicherPosten(),
+    nachziehPlan(session.tenantId),
+  ]);
+
+  const [letzteMessung, briefingZeilen, fehler, konfig, wartend] = await withTenant(
+    session.tenantId,
+    (db) =>
+      Promise.all([
+        db
+          .select({ capturedAt: metricsSnapshots.capturedAt })
+          .from(metricsSnapshots)
+          .orderBy(desc(metricsSnapshots.capturedAt))
+          .limit(1),
+        db.select().from(briefings).orderBy(desc(briefings.briefingDate)).limit(1),
+        // Die Mandantenregel greift auch hier: Jede der vier Tabellen filtert
+        // sich selbst, ohne dass die Abfrage davon wissen muss.
+        db.execute(sql`
         select 'Post' as bereich, ${posts.error} as text, ${posts.updatedAt} as zeitpunkt
           from ${posts} where ${posts.status} = 'failed' and ${posts.error} is not null
         union all
@@ -95,14 +97,16 @@ export default async function SystemPage() {
         order by zeitpunkt desc
         limit 12
       `),
-      db.select({ autoPublish: settings.autoPublish }).from(settings).limit(1),
-      // Was beim Anschalten sofort losliefe — die Zahl macht die Tragweite sichtbar.
-      db
-        .select({ anzahl: sql<number>`count(*)::int` })
-        .from(posts)
-        .where(and(eq(posts.status, "scheduled"), lte(posts.scheduledAt, new Date()))),
-      nachziehPlan(),
-    ]);
+        db.select({ autoPublish: settings.autoPublish }).from(settings).limit(1),
+        // Was beim Anschalten sofort losliefe — die Zahl macht die Tragweite sichtbar.
+        db
+          .select({ anzahl: sql<number>`count(*)::int` })
+          .from(posts)
+          .where(
+            and(eq(posts.status, "scheduled"), lte(posts.scheduledAt, new Date()))
+          ),
+      ])
+  );
 
   const automatikAn = konfig[0]?.autoPublish === true;
   const sofortFaellig = wartend[0]?.anzahl ?? 0;

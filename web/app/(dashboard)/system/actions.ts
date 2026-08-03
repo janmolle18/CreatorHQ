@@ -1,10 +1,10 @@
 "use server";
 
-import { db, posts, settings } from "@creatorhq/db";
+import { posts, settings } from "@creatorhq/db";
 import { inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireSession } from "@/lib/auth";
+import { mitMandant, requireOwner, requireSession } from "@/lib/auth";
 import { analyticsQueue, commentsQueue, maintenanceQueue } from "@/lib/queues";
 import { nachziehPlan } from "@/lib/system";
 
@@ -18,16 +18,20 @@ import { nachziehPlan } from "@/lib/system";
  * veralteter Tab die Automatik unbeabsichtigt wieder an.
  */
 export async function setAutoPublishAction(formData: FormData): Promise<void> {
-  await requireSession();
   const an = formData.get("an") === "1";
 
-  await db
-    .insert(settings)
-    .values({ id: "default", autoPublish: an, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: settings.id,
-      set: { autoPublish: an, updatedAt: new Date() },
-    });
+  // Nur der Inhaber: Automatisches Posten im Namen des Creators ist keine
+  // Entscheidung, die ein eingeladener Video-Editor treffen soll.
+  await requireOwner();
+  await mitMandant((tx, session) =>
+    tx
+      .insert(settings)
+      .values({ tenantId: session.tenantId, creatorName: session.tenantName, autoPublish: an, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: settings.tenantId,
+        set: { autoPublish: an, updatedAt: new Date() },
+      })
+  );
 
   revalidatePath("/system");
   revalidatePath("/posts");
@@ -44,25 +48,27 @@ export async function setAutoPublishAction(formData: FormData): Promise<void> {
  * Vorschau auf /system zeigt vor dem Klick, was passieren wird.
  */
 export async function nachziehenAction(): Promise<void> {
-  await requireSession();
-  const { plan } = await nachziehPlan();
+  const session = await requireSession();
+  const { plan } = await nachziehPlan(session.tenantId);
 
   if (plan.zuweisungen.length === 0) {
     redirect("/system?error=" + encodeURIComponent("Nichts zu verteilen"));
   }
 
-  for (const zuweisung of plan.zuweisungen) {
-    await db
-      .update(posts)
-      .set({
-        status: "scheduled",
-        scheduledAt: zuweisung.zeitpunkt,
-        error: null,
-        attemptCount: 0,
-        updatedAt: new Date(),
-      })
-      .where(inArray(posts.id, zuweisung.postIds));
-  }
+  await mitMandant(async (tx) => {
+    for (const zuweisung of plan.zuweisungen) {
+      await tx
+        .update(posts)
+        .set({
+          status: "scheduled",
+          scheduledAt: zuweisung.zeitpunkt,
+          error: null,
+          attemptCount: 0,
+          updatedAt: new Date(),
+        })
+        .where(inArray(posts.id, zuweisung.postIds));
+    }
+  });
 
   revalidatePath("/system");
   revalidatePath("/posts");
@@ -71,21 +77,39 @@ export async function nachziehenAction(): Promise<void> {
 }
 
 export async function runAnalyticsAction(): Promise<void> {
-  await requireSession();
-  await analyticsQueue().add("daily-analytics", {}, { jobId: `manual-analytics-${Date.now()}` });
+  const session = await requireSession();
+  await analyticsQueue().add(
+    "daily-analytics",
+    { tenantId: session.tenantId },
+    { jobId: `manual-analytics-${session.tenantId}-${Date.now()}` }
+  );
   revalidatePath("/system");
   redirect("/system?gestartet=Messung");
 }
 
 export async function syncCommentsAction(): Promise<void> {
-  await requireSession();
-  await commentsQueue().add("sync-comments", {}, { jobId: `manual-comments-${Date.now()}` });
+  const session = await requireSession();
+  await commentsQueue().add(
+    "sync-comments",
+    { tenantId: session.tenantId },
+    { jobId: `manual-comments-${session.tenantId}-${Date.now()}` }
+  );
   revalidatePath("/system");
   redirect("/system?gestartet=Kommentar-Abgleich");
 }
 
+/**
+ * Sicherung der GESAMTEN Datenbank — plattformweit, nicht je Mandant.
+ *
+ * Deshalb nur für Jan: Ein Creator, der hier klickt, würde einen Dump mit den
+ * Daten aller anderen Kunden erzeugen. Beim Einzelplatz-Vorgänger war das
+ * dieselbe Person; hier nicht mehr.
+ */
 export async function runBackupAction(): Promise<void> {
-  await requireSession();
+  const session = await requireSession();
+  if (!session.isPlatformAdmin) {
+    redirect("/system?error=" + encodeURIComponent("Dafür fehlt dir die Berechtigung"));
+  }
   await maintenanceQueue().add("backup-daily", {}, { jobId: `manual-backup-${Date.now()}` });
   revalidatePath("/system");
   redirect("/system?gestartet=Sicherung");

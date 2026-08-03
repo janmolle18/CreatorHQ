@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { db, clips } from "@creatorhq/db";
+import { clips, withTenant } from "@creatorhq/db";
 import { getSession } from "@/lib/auth";
 import { putObject } from "@/lib/storage";
 
@@ -18,7 +18,8 @@ interface ImportResult {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!(await getSession())) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 });
   }
 
@@ -47,14 +48,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const body = Buffer.from(await file.arrayBuffer());
       await putObject(key, body, "video/mp4");
 
-      await db.insert(clips).values({
+      await withTenant(session.tenantId, (tx) =>
+        tx.insert(clips).values({
         id: clipId,
+        tenantId: session.tenantId,
         origin: "imported",
         provider: "import",
         status: "rendered",
         renderedPath: key,
         title: file.name.replace(/\.mp4$/i, ""),
-      });
+        })
+      );
       results.push({ file: file.name, ok: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload fehlgeschlagen";

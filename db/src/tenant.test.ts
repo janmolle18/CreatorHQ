@@ -26,12 +26,15 @@ describe.skipIf(!TEST_URL)("Mandantentrennung (RLS)", () => {
     tenantId: string | null,
     lauf: (tx: postgres.TransactionSql) => Promise<T>
   ): Promise<T> {
-    return sql.begin(async (tx) => {
+    // postgres.js gibt für begin() einen entpackten Array-Typ zurück; hier
+    // reichen wir genau das durch, was `lauf` liefert.
+    const ergebnis = await sql.begin(async (tx) => {
       if (tenantId !== null) {
         await tx`select set_config('app.tenant_id', ${tenantId}, true)`;
       }
-      return lauf(tx);
+      return [await lauf(tx)];
     });
+    return (ergebnis as unknown as [T])[0];
   }
 
   async function clipAnzahl(tenantId: string | null): Promise<number> {

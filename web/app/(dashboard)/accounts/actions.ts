@@ -5,7 +5,7 @@ import { isValidSlot, publishPlatformSchema } from "@creatorhq/shared";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireSession } from "@/lib/auth";
+import { mitMandant } from "@/lib/auth";
 
 const planSchema = z.object({
   platform: publishPlatformSchema,
@@ -28,8 +28,6 @@ const planSchema = z.object({
 
 /** Posting-Plan (Slots + Kappe) je Plattform speichern — auch ohne OAuth nutzbar. */
 export async function savePostingPlanAction(formData: FormData): Promise<void> {
-  await requireSession();
-
   const parsed = planSchema.safeParse({
     platform: formData.get("platform"),
     clipsPerDay: formData.get("clipsPerDay"),
@@ -42,10 +40,17 @@ export async function savePostingPlanAction(formData: FormData): Promise<void> {
 
   const { platform, clipsPerDay, timeSlots } = parsed.data;
   const values = { clipsPerDay, timeSlots, updatedAt: new Date() };
-  await db
-    .insert(socialAccounts)
-    .values({ platform, ...values })
-    .onConflictDoUpdate({ target: socialAccounts.platform, set: values });
+  await mitMandant(async (tx, session) => {
+    await tx
+      .insert(socialAccounts)
+      .values({ tenantId: session.tenantId, platform, ...values })
+      // Ziel ist jetzt das Paar aus Mandant und Plattform — mit der alten,
+      // global eindeutigen Spalte hätte der zweite Kunde den ersten überschrieben.
+      .onConflictDoUpdate({
+        target: [socialAccounts.tenantId, socialAccounts.platform],
+        set: values,
+      });
+  });
 
   revalidatePath("/accounts");
   redirect("/accounts?saved=1");

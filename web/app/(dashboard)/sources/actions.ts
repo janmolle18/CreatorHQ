@@ -1,14 +1,13 @@
 "use server";
 
-import { db, sourceVideos } from "@creatorhq/db";
+import { sourceVideos } from "@creatorhq/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireSession } from "@/lib/auth";
+import { mitMandant, requireSession } from "@/lib/auth";
 import { parseTwitchVodId, parseYoutubeVideoId } from "@/lib/parse";
 import { downloadQueue, maintenanceQueue } from "@/lib/queues";
 
 export async function addSourceAction(formData: FormData): Promise<void> {
-  await requireSession();
   const input = String(formData.get("url") ?? "").trim();
   if (!input) redirect("/sources?error=Bitte%20einen%20Link%20einf%C3%BCgen");
 
@@ -35,41 +34,50 @@ export async function addSourceAction(formData: FormData): Promise<void> {
         url: `https://www.twitch.tv/videos/${twitchVodId}`,
       };
 
-  const inserted = await db
-    .insert(sourceVideos)
-    .values({ ...values, status: "discovered" })
-    .onConflictDoNothing()
-    .returning({ id: sourceVideos.id });
+  // Die Eindeutigkeit greift jetzt je Mandant: Zwei Creator duerfen dasselbe
+  // oeffentliche Video als Quelle haben, ohne sich zu blockieren.
+  const { neu, tenantId } = await mitMandant(async (tx, session) => {
+    const eingefuegt = await tx
+      .insert(sourceVideos)
+      .values({ tenantId: session.tenantId, ...values, status: "discovered" })
+      .onConflictDoNothing()
+      .returning({ id: sourceVideos.id });
+    return { neu: eingefuegt[0] ?? null, tenantId: session.tenantId };
+  });
 
   // Direkt einreihen (jobId dedupliziert); der ingest-tick ist das Sicherheitsnetz.
-  if (inserted[0]) {
+  if (neu) {
     await downloadQueue().add(
       "download",
-      { sourceVideoId: inserted[0].id },
-      { jobId: `download-${inserted[0].id}` }
+      { tenantId, sourceVideoId: neu.id },
+      { jobId: `download-${neu.id}` }
     );
   }
 
   revalidatePath("/sources");
-  redirect(inserted[0] ? "/sources?added=1" : "/sources?exists=1");
+  redirect(neu ? "/sources?added=1" : "/sources?exists=1");
 }
 
 export async function scanChannelAction(): Promise<void> {
-  await requireSession();
-  await maintenanceQueue().add("scan-channel", {}, { jobId: `scan-${Date.now()}` });
+  const session = await requireSession();
+  await maintenanceQueue().add(
+    "scan-channel",
+    { tenantId: session.tenantId },
+    { jobId: `scan-${session.tenantId}-${Date.now()}` }
+  );
   revalidatePath("/sources");
   redirect("/sources?scan=1");
 }
 
 export async function createClipsAction(formData: FormData): Promise<void> {
-  await requireSession();
+  const session = await requireSession();
   const sourceVideoId = String(formData.get("sourceVideoId") ?? "");
   if (!sourceVideoId) return;
 
   const { clipQueue } = await import("@/lib/queues");
   await clipQueue().add(
     "clip",
-    { sourceVideoId },
+    { tenantId: session.tenantId, sourceVideoId },
     { jobId: `clip-manual-${sourceVideoId}-${Date.now()}` }
   );
   revalidatePath("/sources");

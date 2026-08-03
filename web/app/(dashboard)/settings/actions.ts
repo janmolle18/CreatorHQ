@@ -5,7 +5,7 @@ import { isValidTimezone, publishTargetsSchema } from "@creatorhq/shared";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireSession } from "@/lib/auth";
+import { mitMandant } from "@/lib/auth";
 
 const settingsSchema = z.object({
   creatorName: z.string().trim().min(1, "Name fehlt").max(120),
@@ -20,8 +20,6 @@ const settingsSchema = z.object({
 });
 
 export async function saveSettingsAction(formData: FormData): Promise<void> {
-  await requireSession();
-
   const parsed = settingsSchema.safeParse({
     creatorName: formData.get("creatorName") ?? "",
     youtubeChannelId: formData.get("youtubeChannelId") ?? "",
@@ -47,10 +45,12 @@ export async function saveSettingsAction(formData: FormData): Promise<void> {
     updatedAt: new Date(),
   };
 
-  await db
-    .insert(settings)
-    .values({ id: "default", ...values })
-    .onConflictDoUpdate({ target: settings.id, set: values });
+  await mitMandant(async (tx, session) => {
+    await tx
+      .insert(settings)
+      .values({ tenantId: session.tenantId, ...values })
+      .onConflictDoUpdate({ target: settings.tenantId, set: values });
+  });
 
   revalidatePath("/settings");
   redirect("/settings?saved=1");

@@ -2,9 +2,20 @@ import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { SESSION_COOKIE } from "@/lib/auth";
 
-// Schützt alles außer /login und den OAuth-Callbacks (/api/oauth/*).
+// Schützt alles außer Anmeldung, Registrierung und den OAuth-Rückleitungen.
+//
+// Bewusst nur eine BILLIGE Prüfung: Läuft die Signatur des Kekses auf, geht es
+// zum Login. Ob die Mitgliedschaft noch besteht und der Mandant nicht gekündigt
+// ist, prüft requireSession() gegen die Datenbank — hier oben ginge das nicht,
+// die Middleware läuft ohne Datenbankzugriff vor jeder einzelnen Anfrage.
 
-const PUBLIC_PREFIXES = ["/login", "/api/oauth", "/api/public-media"];
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/registrieren",
+  "/passwort",
+  "/api/oauth",
+  "/api/public-media",
+];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PREFIXES.some(
@@ -21,7 +32,9 @@ export async function middleware(request: NextRequest) {
     try {
       const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? "");
       const { payload } = await jwtVerify(token, secret);
-      if (payload.sub === "admin") return NextResponse.next();
+      if (typeof payload.sub === "string" && typeof payload.tid === "string") {
+        return NextResponse.next();
+      }
     } catch {
       // ungültig/abgelaufen → Login
     }

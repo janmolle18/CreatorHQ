@@ -1,6 +1,12 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { clips, db, posts, settings, socialAccounts } from "@creatorhq/db";
+import {
+  clips,
+  posts,
+  settings,
+  socialAccounts,
+  withTenant,
+} from "@creatorhq/db";
 import {
   DEFAULT_TIMEZONE,
   planNachziehen,
@@ -18,77 +24,84 @@ const NACHZIEHBAR = ["awaiting_manual", "scheduled", "failed"] as const;
  * Ein Video bekommt EINEN Zeitpunkt für alle seine Plattformen, damit im
  * Kalender nicht dasselbe Video dreimal verstreut auftaucht.
  */
-export async function nachziehPlan(): Promise<{
+export async function nachziehPlan(tenantId: string): Promise<{
   plan: NachziehPlan;
   timeZone: string;
   offen: number;
 }> {
-  const [config] = await db.select().from(settings).limit(1);
-  const timeZone = config?.timezone ?? DEFAULT_TIMEZONE;
-  const jetzt = new Date();
+  return withTenant(tenantId, async (db) => {
+    const [config] = await db.select().from(settings).limit(1);
+    const timeZone = config?.timezone ?? DEFAULT_TIMEZONE;
+    const jetzt = new Date();
 
-  const konten = await db.select().from(socialAccounts);
-  const proTag: Record<string, number> = {};
-  const raster = new Set<string>();
-  for (const konto of konten) {
-    proTag[konto.platform] = konto.clipsPerDay;
-    for (const slot of konto.timeSlots) raster.add(slot);
-  }
-  const timeSlots = raster.size > 0 ? [...raster].sort() : ["09:00", "14:00", "19:00"];
+    const konten = await db.select().from(socialAccounts);
+    const proTag: Record<string, number> = {};
+    const raster = new Set<string>();
+    for (const konto of konten) {
+      proTag[konto.platform] = konto.clipsPerDay;
+      for (const slot of konto.timeSlots) raster.add(slot);
+    }
+    const timeSlots =
+      raster.size > 0 ? [...raster].sort() : ["09:00", "14:00", "19:00"];
 
-  // Überfällig oder wartend — alles, was ohne Zutun nie rausginge.
-  const wartend = await db
-    .select({
-      postId: posts.id,
-      clipId: posts.clipId,
-      platform: posts.platform,
-      scheduledAt: posts.scheduledAt,
-    })
-    .from(posts)
-    .innerJoin(clips, eq(posts.clipId, clips.id))
-    .where(
-      and(
-        inArray(posts.status, [...NACHZIEHBAR]),
-        or(lte(posts.scheduledAt, jetzt), eq(posts.status, "awaiting_manual"))
+    // Überfällig oder wartend — alles, was ohne Zutun nie rausginge.
+    const wartend = await db
+      .select({
+        postId: posts.id,
+        clipId: posts.clipId,
+        platform: posts.platform,
+        scheduledAt: posts.scheduledAt,
+      })
+      .from(posts)
+      .innerJoin(clips, eq(posts.clipId, clips.id))
+      .where(
+        and(
+          inArray(posts.status, [...NACHZIEHBAR]),
+          or(
+            lte(posts.scheduledAt, jetzt),
+            eq(posts.status, "awaiting_manual"),
+          ),
+        ),
       )
-    )
-    .orderBy(asc(posts.scheduledAt));
+      .orderBy(asc(posts.scheduledAt));
 
-  // Zukünftige Termine bleiben unangetastet und blockieren ihre Slots.
-  const kuenftig = await db
-    .select({ platform: posts.platform, scheduledAt: posts.scheduledAt })
-    .from(posts)
-    .where(and(eq(posts.status, "scheduled"), gt(posts.scheduledAt, jetzt)));
-  const belegt: Record<string, Date[]> = {};
-  for (const zeile of kuenftig) {
-    if (!zeile.scheduledAt) continue;
-    (belegt[zeile.platform] ??= []).push(zeile.scheduledAt);
-  }
+    // Zukünftige Termine bleiben unangetastet und blockieren ihre Slots.
+    const kuenftig = await db
+      .select({ platform: posts.platform, scheduledAt: posts.scheduledAt })
+      .from(posts)
+      .where(and(eq(posts.status, "scheduled"), gt(posts.scheduledAt, jetzt)));
+    const belegt: Record<string, Date[]> = {};
+    for (const zeile of kuenftig) {
+      if (!zeile.scheduledAt) continue;
+      (belegt[zeile.platform] ??= []).push(zeile.scheduledAt);
+    }
 
-  const proClip = new Map<string, NachziehGruppe>();
-  for (const zeile of wartend) {
-    const gruppe = proClip.get(zeile.clipId) ?? {
-      clipId: zeile.clipId,
-      postIds: [],
-      platforms: [],
-    };
-    gruppe.postIds.push(zeile.postId);
-    if (!gruppe.platforms.includes(zeile.platform)) gruppe.platforms.push(zeile.platform);
-    proClip.set(zeile.clipId, gruppe);
-  }
+    const proClip = new Map<string, NachziehGruppe>();
+    for (const zeile of wartend) {
+      const gruppe = proClip.get(zeile.clipId) ?? {
+        clipId: zeile.clipId,
+        postIds: [],
+        platforms: [],
+      };
+      gruppe.postIds.push(zeile.postId);
+      if (!gruppe.platforms.includes(zeile.platform))
+        gruppe.platforms.push(zeile.platform);
+      proClip.set(zeile.clipId, gruppe);
+    }
 
-  return {
-    plan: planNachziehen({
+    return {
+      plan: planNachziehen({
+        timeZone,
+        timeSlots,
+        now: jetzt,
+        gruppen: [...proClip.values()],
+        proTag,
+        belegt,
+      }),
       timeZone,
-      timeSlots,
-      now: jetzt,
-      gruppen: [...proClip.values()],
-      proTag,
-      belegt,
-    }),
-    timeZone,
-    offen: wartend.length,
-  };
+      offen: wartend.length,
+    };
+  });
 }
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
@@ -110,14 +123,16 @@ export interface BackupInfo {
 export async function backupInfo(): Promise<BackupInfo> {
   const verzeichnis = path.join(ROOT, "backups");
   try {
-    const dateien = (await readdir(verzeichnis)).filter((name) => name.endsWith(".sql.gz"));
+    const dateien = (await readdir(verzeichnis)).filter((name) =>
+      name.endsWith(".sql.gz"),
+    );
     if (dateien.length === 0) return { neuestes: null, anzahl: 0 };
 
     const mitZeit = await Promise.all(
       dateien.map(async (name) => {
         const info = await stat(path.join(verzeichnis, name));
         return { name, mtimeMs: info.mtimeMs, groesseBytes: info.size };
-      })
+      }),
     );
     mitZeit.sort((a, b) => b.mtimeMs - a.mtimeMs);
     const neuestes = mitZeit[0]!;
@@ -165,7 +180,9 @@ export async function zugangInfo(): Promise<ZugangInfo> {
       syncAlterMinuten: (Date.now() - info.mtimeMs) / 60_000,
       medienUrl,
       medienPasstZumTunnel:
-        medienUrl !== null && tunnelUrl !== null && medienUrl.startsWith(tunnelUrl),
+        medienUrl !== null &&
+        tunnelUrl !== null &&
+        medienUrl.startsWith(tunnelUrl),
     };
   } catch (error) {
     return {
@@ -196,7 +213,9 @@ const s3 = new S3Client({
   },
 });
 
-async function praefixGroesse(praefix: string): Promise<{ bytes: number; objekte: number }> {
+async function praefixGroesse(
+  praefix: string,
+): Promise<{ bytes: number; objekte: number }> {
   let bytes = 0;
   let objekte = 0;
   let token: string | undefined;
@@ -206,7 +225,7 @@ async function praefixGroesse(praefix: string): Promise<{ bytes: number; objekte
         Bucket: process.env.S3_BUCKET ?? "creatorhq",
         Prefix: praefix,
         ContinuationToken: token,
-      })
+      }),
     );
     for (const objekt of antwort.Contents ?? []) {
       bytes += objekt.Size ?? 0;
@@ -245,9 +264,15 @@ export async function speicherPosten(): Promise<SpeicherPosten[]> {
       ...r,
       unersetzlich: true,
     })),
-    verzeichnisGroesse("tmp").then((bytes) => ({ name: "Arbeitsordner", bytes })),
+    verzeichnisGroesse("tmp").then((bytes) => ({
+      name: "Arbeitsordner",
+      bytes,
+    })),
     verzeichnisGroesse("logs").then((bytes) => ({ name: "Protokolle", bytes })),
-    verzeichnisGroesse("backups").then((bytes) => ({ name: "Sicherungen", bytes })),
+    verzeichnisGroesse("backups").then((bytes) => ({
+      name: "Sicherungen",
+      bytes,
+    })),
   ]);
 
   return posten

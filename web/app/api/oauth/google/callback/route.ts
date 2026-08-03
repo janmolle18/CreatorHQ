@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getSession } from "@/lib/auth";
 import { appUrl } from "@/lib/origin";
-import { db, socialAccounts } from "@creatorhq/db";
+import { socialAccounts, withTenant } from "@creatorhq/db";
 import { encryptSecret } from "@creatorhq/shared";
 import { exchangeGoogleCode, fetchChannelInfo } from "@/lib/google";
 
@@ -14,6 +15,12 @@ export async function GET(req: NextRequest) {
     NextResponse.redirect(
       appUrl(req, `/accounts?error=${encodeURIComponent(message.slice(0, 120))}`)
     );
+
+  // Die Rueckleitung liegt hinter der Middleware-Ausnahme /api/oauth/* und war
+  // damit unangemeldet erreichbar. Bei einem einzigen Konto fiel das nicht auf;
+  // mit mehreren Mandanten entscheidet die Sitzung, WESSEN Konto verbunden wird.
+  const session = await getSession();
+  if (!session) return fail("Bitte zuerst anmelden und erneut verbinden");
 
   if (googleError) return fail(`Google: ${googleError}`);
   if (!code || !state) return fail("OAuth-Antwort unvollständig");
@@ -42,10 +49,15 @@ export async function GET(req: NextRequest) {
       lastError: null,
       updatedAt: new Date(),
     };
-    await db
-      .insert(socialAccounts)
-      .values({ platform: "youtube", ...values })
-      .onConflictDoUpdate({ target: socialAccounts.platform, set: values });
+    await withTenant(session.tenantId, (tx) =>
+      tx
+        .insert(socialAccounts)
+        .values({ tenantId: session.tenantId, platform: "youtube", ...values })
+        .onConflictDoUpdate({
+          target: [socialAccounts.tenantId, socialAccounts.platform],
+          set: values,
+        })
+    );
 
     const res = NextResponse.redirect(appUrl(req, "/accounts?connected=youtube"));
     res.cookies.delete("g_state");
