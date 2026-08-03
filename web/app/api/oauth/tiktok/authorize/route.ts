@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       appUrl(
         req,
         "/accounts?error=" +
-          encodeURIComponent("TikTok ist noch nicht eingerichtet — Jan muss das freischalten")
+          encodeURIComponent("TikTok ist noch nicht eingerichtet — wir müssen das freischalten")
       )
     );
   }

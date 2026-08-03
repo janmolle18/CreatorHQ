@@ -4,8 +4,8 @@ import { requireSession } from "@/lib/auth";
 import { NavLink } from "@/components/nav-link";
 import { logoutAction } from "@/app/login/actions";
 
-// Davids Alltag zuerst, Verwaltung abgesetzt darunter. Reihenfolge folgt
-// seinem Tagesablauf: Was ist zu tun → posten → entscheiden → nachschauen.
+// Alltag zuerst, Verwaltung abgesetzt darunter. Die Reihenfolge folgt dem
+// Tagesablauf eines Creators: Was ist zu tun → posten → entscheiden → nachsehen.
 const NAV_ALLTAG = [
   { href: "/", label: "Übersicht" },
   { href: "/posts", label: "Posten" },
@@ -23,28 +23,36 @@ const NAV_VERWALTUNG = [
   { href: "/system", label: "System" },
 ];
 
+/** Anfangsbuchstaben als Platzhalter, solange kein Profilbild hinterlegt ist. */
+function initialen(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((teil) => teil[0]!.toUpperCase())
+    .join("");
+}
+
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  await requireSession();
+  const session = await requireSession();
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col md:grid md:grid-cols-[230px_1fr]">
       <aside className="flex flex-col border-b border-hairline px-6 py-6 md:sticky md:top-0 md:h-screen md:justify-between md:border-b-0 md:border-r md:py-10">
         <div>
           <Link href="/" className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element -- lokales statisches Bild */}
-            <img
-              src="/david.jpg"
-              alt="Profilbild davidvorkamera"
-              width={44}
-              height={44}
-              className="h-11 w-11 rounded-full border border-hairline object-cover"
-            />
-            <span>
+            <span
+              aria-hidden="true"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-hairline bg-ink text-sm font-semibold text-paper"
+            >
+              {initialen(session.tenantName)}
+            </span>
+            <span className="min-w-0">
               <span className="block text-xl font-bold leading-tight tracking-tight">
                 CreatorHQ
               </span>
-              <span className="mt-0.5 block text-[10px] uppercase tracking-[0.18em] text-ink-faint">
-                @davidvorkamera
+              <span className="mt-0.5 block truncate text-[10px] uppercase tracking-[0.18em] text-ink-faint">
+                {session.tenantName}
               </span>
             </span>
           </Link>

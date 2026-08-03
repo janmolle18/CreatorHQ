@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 export const metadata = {
   title: "CreatorHQ",
-  description: "Creator Dashboard für David — Clips, Publishing, Analytics, Briefing",
+  description: "Aus deinen Videos werden Clips — Schnitt, Terminplanung und Veröffentlichung auf allen Kanälen",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

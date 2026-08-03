@@ -15,7 +15,7 @@ export default defineConfig({
     url:
       process.env.MIGRATION_DATABASE_URL ??
       process.env.DATABASE_URL ??
-      "postgres://creatorhq:creatorhq@localhost:5434/creatorhq",
+      "postgres://creatorhq:creatorhq@localhost:5435/creatorhq",
   },
   verbose: true,
   strict: true,

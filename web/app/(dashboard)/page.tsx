@@ -16,7 +16,7 @@ import { POST_STATUS, postUrgency } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
 
-// Davids Startseite beantwortet genau eine Frage: Was ist jetzt zu tun?
+// Die Startseite beantwortet genau eine Frage: Was ist jetzt zu tun?
 // Technik gehört auf /system — hier steht nur seine Arbeit.
 
 interface Aufgabe {
@@ -71,7 +71,7 @@ export default async function OverviewPage() {
   const timeZone = config?.timezone ?? DEFAULT_TIMEZONE;
   const today = todayInTz(timeZone);
   const now = new Date();
-  // Tagesende in Davids Zeitzone — die Grenze zwischen „heute" und „später".
+  // Tagesende in der Zeitzone des Creators — die Grenze zwischen „heute" und „später".
   const tagesEnde = slotToUtc(today, "23:59", timeZone);
 
   const [infra, accountSnapshots, offenePosts, kandidaten, inArbeit, briefingZeilen] =
@@ -127,11 +127,11 @@ export default async function OverviewPage() {
         <p className="mb-10 border border-err/40 px-5 py-4 text-meta">
           <StatusText tone="err">Die Technik hat gerade ein Problem</StatusText>{" "}
           <span className="text-ink-soft">
-            — Jan kann es unter{" "}
+            — die Einzelheiten stehen unter{" "}
             <Link href="/system" className="underline underline-offset-4">
               System
-            </Link>{" "}
-            nachsehen. Deine Videos gehen nicht verloren.
+            </Link>
+            . Deine Videos gehen nicht verloren.
           </span>
         </p>
       )}

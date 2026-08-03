@@ -9,7 +9,7 @@ const DEFAULTS: Pick<
   Settings,
   "creatorName" | "youtubeChannelId" | "twitchUserId" | "timezone" | "autoDiscovery" | "defaultTargets"
 > = {
-  creatorName: "David",
+  creatorName: "",
   youtubeChannelId: null,
   twitchUserId: null,
   timezone: "Europe/Berlin",

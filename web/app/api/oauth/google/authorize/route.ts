@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       appUrl(
         req,
         "/accounts?error=" +
-          encodeURIComponent("YouTube ist noch nicht eingerichtet — Jan muss das freischalten")
+          encodeURIComponent("YouTube ist noch nicht eingerichtet — wir müssen das freischalten")
       )
     );
   }

@@ -42,8 +42,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Jans Seite. Hier — und nur hier — darf Technik-Sprache stehen:
-// Container, Queue, Redis, Terminal-Befehle. Davids Übersicht bleibt frei davon.
+// Technikseite. Hier — und nur hier — darf Technik-Sprache stehen:
+// Container, Queue, Redis, Terminal-Befehle. Die Übersicht bleibt frei davon.
 
 const BACKUP_WARNUNG_STUNDEN = 30; // nächtlich um 03:30 → älter als 30 h ist auffällig
 
@@ -132,9 +132,9 @@ export default async function SystemPage() {
     <>
       <AutoRefresh intervalMs={10000} active={arbeitLaeuft} />
       <PageHeader
-        kicker="Nur für Jan"
+        kicker="Technik"
         title="System"
-        description="Dienste, Warteschlangen, Sicherung, Zugang und Speicher. Was hier steht, sieht David bewusst nicht."
+        description="Dienste, Warteschlangen, Sicherung, Zugang und Speicher."
         action={
           <Flash
             map={{
@@ -156,7 +156,7 @@ export default async function SystemPage() {
             <StatusText tone={automatikAn ? "ok" : "warn"}>
               {automatikAn
                 ? "Die App postet fällige Videos von selbst"
-                : "David postet selbst — die App lädt nichts hoch"}
+                : "Du postest selbst — die App lädt nichts hoch"}
             </StatusText>
           </div>
 
@@ -168,7 +168,7 @@ export default async function SystemPage() {
               </>
             ) : (
               <>
-                Geplante Posts bleiben stehen, statt hochgeladen zu werden — David sieht sie
+                Geplante Posts bleiben stehen, statt hochgeladen zu werden — du siehst sie
                 weiter als Aufgabe. „Jetzt posten" von Hand bleibt trotzdem möglich, weil das
                 ein bewusster Klick ist.
                 {sofortFaellig > 0 && (
@@ -398,7 +398,7 @@ export default async function SystemPage() {
       </section>
 
       <section className="mb-14">
-        <SectionTitle>Zugang für David</SectionTitle>
+        <SectionTitle>Öffentlicher Zugang</SectionTitle>
         <Card>
           <Zeile label="Einstiegslink">
             <a

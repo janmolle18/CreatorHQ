@@ -2,7 +2,7 @@
   "name": "creatorhq",
   "version": "0.1.0",
   "private": true,
-  "description": "Creator Dashboard für David (@davidvorkamera): Clip-Pipeline, Multi-Plattform-Publishing, Analytics, KI-Briefing, Content-Planung",
+  "description": "CreatorHQ — Clip-Pipeline, Multi-Plattform-Publishing, Analytics, KI-Briefing und Content-Planung fuer mehrere Creator",
   "workspaces": [
     "db",
     "shared",
@@ -19,13 +19,12 @@
     "web:dev": "npm run -w @creatorhq/web dev",
     "web:build": "npm run -w @creatorhq/web build",
     "web:start": "npm run -w @creatorhq/web start",
-    "web:deploy": "npm run web:build && launchctl kickstart -k gui/$(id -u)/com.creatorhq.web",
-    "tunnel:url": "grep -o 'https://[a-z0-9-]*\\.trycloudflare\\.com' logs/tunnel.log | tail -1",
-    "link:deploy": "npx --yes vercel deploy --prod --yes --cwd ops/link",
     "worker:dev": "npm run -w @creatorhq/worker dev",
     "up": "docker compose up -d",
     "down": "docker compose down",
-    "logs": "docker compose logs -f"
+    "logs": "docker compose logs -f",
+    "setup": "./scripts/setup-local.sh",
+    "testdb": "./scripts/test-db.sh test"
   },
   "engines": {
     "node": ">=20"

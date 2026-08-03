@@ -1,5 +1,35 @@
 # CreatorHQ
 
+## So startest du es
+
+Einmalig einrichten (legt `.env` mit lokalen Zugangsdaten an, startet die drei
+Container, spielt die Migrationen ein):
+
+```bash
+npm run setup
+```
+
+Danach jedes Mal:
+
+```bash
+npm run web:dev
+```
+
+Dann **http://localhost:3001/registrieren** öffnen und einen Kanal anlegen.
+
+Die Ports sind gegenüber DavidHQ verschoben (Web 3001, Postgres 5435, Redis 6381,
+MinIO 9004) — beide Projekte laufen gleichzeitig, ohne sich zu stören.
+
+Die Mandantentrennung gegen eine echte Datenbank prüfen:
+
+```bash
+npm run testdb
+```
+
+Die Plattform-Schlüssel (Google, TikTok, Meta, Anthropic) bleiben in `.env` leer.
+Ohne sie funktioniert alles außer Konten verbinden, Clippen und Briefing.
+
+
 Creator Dashboard für David (@davidvorkamera): Clip-Pipeline (Download → KI-Clipping → Whisper-Untertitel → 9:16-Render mit Burn-in), Multi-Plattform-Publishing (TikTok, Instagram Reels, YouTube Shorts) mit durchgängigem Manual-Fallback, tägliche Analytics, KI-Briefing und Content-Planung. Eigenständige Weiterentwicklung der erprobten ClipPilot-Pipeline — mit behobenen Schwächen (Auth, Zeitzonen, Token-Verschlüsselung, Chunked-Uploads, Tests).
 
 Bauplan, Phasen-Status und Abschlussbericht: [PLAN.md](PLAN.md).
