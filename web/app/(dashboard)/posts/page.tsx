@@ -1,4 +1,14 @@
-import { db, clips, posts, settings, socialAccounts, type Clip, type Post } from "@creatorhq/db";
+import {
+  clips,
+  posts,
+  settings,
+  socialAccounts,
+  type Clip,
+  type Post,
+  withTenant,
+  type TenantDB,
+} from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import {
   DEFAULT_TIMEZONE,
   formatInTz,
@@ -105,7 +115,14 @@ function VideoThumb({ clip }: { clip: Clip }) {
   return <div className="aspect-video w-full border border-dashed border-hairline" />;
 }
 
-export default async function PostsPage({
+export default async function PostsPage(props: Parameters<typeof PostsPageInhalt>[0]) {
+  const session = await requireSession();
+  // Der gesamte Seitenkoerper laeuft in der Mandantengrenze. Ohne sie
+  // liefert die Datenbank null Zeilen — die Seite waere leer statt falsch.
+  return withTenant(session.tenantId, (db) => PostsPageInhalt(props, db));
+}
+
+async function PostsPageInhalt({
   searchParams,
 }: {
   searchParams: Promise<{
@@ -115,7 +132,9 @@ export default async function PostsPage({
     rebuilt?: string;
     manual?: string;
   }>;
-}) {
+},
+  db: TenantDB,
+) {
   const { done, error, pushed, rebuilt, manual } = await searchParams;
   const [config] = await db.select().from(settings).limit(1);
   const timeZone = config?.timezone ?? DEFAULT_TIMEZONE;

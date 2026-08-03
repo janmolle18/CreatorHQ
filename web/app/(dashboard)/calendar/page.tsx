@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { calendarItems, db, posts, settings, type CalendarItem } from "@creatorhq/db";
+import {
+  calendarItems,
+  posts,
+  settings,
+  type CalendarItem,
+  withTenant,
+  type TenantDB,
+} from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import {
   DEFAULT_TIMEZONE,
   formatInTz,
@@ -47,11 +55,20 @@ interface DayEntry {
   tone: "post" | "item";
 }
 
-export default async function CalendarPage({
+export default async function CalendarPage(props: Parameters<typeof CalendarPageInhalt>[0]) {
+  const session = await requireSession();
+  // Der gesamte Seitenkoerper laeuft in der Mandantengrenze. Ohne sie
+  // liefert die Datenbank null Zeilen — die Seite waere leer statt falsch.
+  return withTenant(session.tenantId, (db) => CalendarPageInhalt(props, db));
+}
+
+async function CalendarPageInhalt({
   searchParams,
 }: {
   searchParams: Promise<{ month?: string }>;
-}) {
+},
+  db: TenantDB,
+) {
   const params = await searchParams;
   const [config] = await db.select().from(settings).limit(1);
   const timeZone = config?.timezone ?? DEFAULT_TIMEZONE;

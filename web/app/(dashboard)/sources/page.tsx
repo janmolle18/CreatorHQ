@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { db, metricsSnapshots, sourceVideos, type SourceVideo } from "@creatorhq/db";
+import {
+  metricsSnapshots,
+  sourceVideos,
+  type SourceVideo,
+  withTenant,
+  type TenantDB,
+} from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import { asc, desc, isNotNull } from "drizzle-orm";
 import { AutoRefresh } from "@/components/auto-refresh";
 import {
@@ -50,7 +57,14 @@ const MESSAGES: Record<string, { text: string; tone: "ok" | "warn" | "err" }> = 
   clipping: { text: "Clip-Suche gestartet — Kandidaten erscheinen auf der Clips-Seite", tone: "ok" },
 };
 
-export default async function SourcesPage({
+export default async function SourcesPage(props: Parameters<typeof SourcesPageInhalt>[0]) {
+  const session = await requireSession();
+  // Der gesamte Seitenkoerper laeuft in der Mandantengrenze. Ohne sie
+  // liefert die Datenbank null Zeilen — die Seite waere leer statt falsch.
+  return withTenant(session.tenantId, (db) => SourcesPageInhalt(props, db));
+}
+
+async function SourcesPageInhalt({
   searchParams,
 }: {
   searchParams: Promise<{
@@ -60,7 +74,9 @@ export default async function SourcesPage({
     clipping?: string;
     error?: string;
   }>;
-}) {
+},
+  db: TenantDB,
+) {
   const params = await searchParams;
   const message = params.error
     ? { text: params.error, tone: "err" as const }

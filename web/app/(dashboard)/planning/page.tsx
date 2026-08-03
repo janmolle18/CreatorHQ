@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { db, ideas, type Idea } from "@creatorhq/db";
+import {
+  ideas,
+  type Idea,
+  withTenant,
+  type TenantDB,
+} from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import { PLATFORM_SHORT, PUBLISH_PLATFORMS, PLATFORM_LABELS, type PublishPlatform } from "@creatorhq/shared";
 import { asc } from "drizzle-orm";
 import {
@@ -60,11 +66,20 @@ function StatusButton({
   );
 }
 
-export default async function PlanningPage({
+export default async function PlanningPage(props: Parameters<typeof PlanningPageInhalt>[0]) {
+  const session = await requireSession();
+  // Der gesamte Seitenkoerper laeuft in der Mandantengrenze. Ohne sie
+  // liefert die Datenbank null Zeilen — die Seite waere leer statt falsch.
+  return withTenant(session.tenantId, (db) => PlanningPageInhalt(props, db));
+}
+
+async function PlanningPageInhalt({
   searchParams,
 }: {
   searchParams: Promise<{ created?: string; shoot?: string; error?: string }>;
-}) {
+},
+  db: TenantDB,
+) {
   const { created, shoot, error } = await searchParams;
   const rows = await db.select().from(ideas).orderBy(asc(ideas.createdAt));
   const discarded = rows.filter((idea) => idea.status === "discarded");

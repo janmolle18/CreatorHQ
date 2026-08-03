@@ -1,4 +1,10 @@
-import { db, settings, type Settings } from "@creatorhq/db";
+import {
+  settings,
+  type Settings,
+  withTenant,
+  type TenantDB,
+} from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import { PLATFORM_LABELS, PUBLISH_PLATFORMS } from "@creatorhq/shared";
 import { Button, Field, Input, PageHeader, SectionTitle, StatusText } from "@/components/ui";
 import { saveSettingsAction } from "./actions";
@@ -17,11 +23,20 @@ const DEFAULTS: Pick<
   defaultTargets: [],
 };
 
-export default async function SettingsPage({
+export default async function SettingsPage(props: Parameters<typeof SettingsPageInhalt>[0]) {
+  const session = await requireSession();
+  // Der gesamte Seitenkoerper laeuft in der Mandantengrenze. Ohne sie
+  // liefert die Datenbank null Zeilen — die Seite waere leer statt falsch.
+  return withTenant(session.tenantId, (db) => SettingsPageInhalt(props, db));
+}
+
+async function SettingsPageInhalt({
   searchParams,
 }: {
   searchParams: Promise<{ saved?: string; error?: string }>;
-}) {
+},
+  db: TenantDB,
+) {
   const { saved, error } = await searchParams;
   const [row] = await db.select().from(settings).limit(1);
   const current = row ?? DEFAULTS;

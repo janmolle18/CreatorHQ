@@ -1,4 +1,13 @@
-import { db, clips, posts, settings, sourceVideos, type Post } from "@creatorhq/db";
+import {
+  clips,
+  posts,
+  settings,
+  sourceVideos,
+  type Post,
+  withTenant,
+  type TenantDB,
+} from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import { DEFAULT_TIMEZONE, PUBLISH_PLATFORMS } from "@creatorhq/shared";
 import { desc, eq } from "drizzle-orm";
 import { AutoRefresh } from "@/components/auto-refresh";
@@ -28,11 +37,20 @@ function groupOf(item: BoardItem): BoardGroup {
   return "parked";
 }
 
-export default async function ClipsBoardPage({
+export default async function ClipsBoardPage(props: Parameters<typeof ClipsBoardPageInhalt>[0]) {
+  const session = await requireSession();
+  // Der gesamte Seitenkoerper laeuft in der Mandantengrenze. Ohne sie
+  // liefert die Datenbank null Zeilen — die Seite waere leer statt falsch.
+  return withTenant(session.tenantId, (db) => ClipsBoardPageInhalt(props, db));
+}
+
+async function ClipsBoardPageInhalt({
   searchParams,
 }: {
   searchParams: Promise<{ approved?: string; deleted?: string; error?: string }>;
-}) {
+},
+  db: TenantDB,
+) {
   const { approved, deleted, error } = await searchParams;
 
   const [config] = await db.select().from(settings).limit(1);

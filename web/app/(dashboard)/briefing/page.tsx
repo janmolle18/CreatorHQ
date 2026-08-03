@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { briefings, db, comments } from "@creatorhq/db";
+import {
+  briefings,
+  comments,
+  withTenant,
+  type TenantDB,
+} from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import { desc } from "drizzle-orm";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Button, EmptyState, PageHeader, StatusText } from "@/components/ui";
@@ -13,11 +19,20 @@ function formatDate(iso: string): string {
   return `${day}.${month}.${year}`;
 }
 
-export default async function BriefingPage({
+export default async function BriefingPage(props: Parameters<typeof BriefingPageInhalt>[0]) {
+  const session = await requireSession();
+  // Der gesamte Seitenkoerper laeuft in der Mandantengrenze. Ohne sie
+  // liefert die Datenbank null Zeilen — die Seite waere leer statt falsch.
+  return withTenant(session.tenantId, (db) => BriefingPageInhalt(props, db));
+}
+
+async function BriefingPageInhalt({
   searchParams,
 }: {
   searchParams: Promise<{ adopted?: string; error?: string; started?: string }>;
-}) {
+},
+  db: TenantDB,
+) {
   const { adopted, error, started } = await searchParams;
   const rows = await db.select().from(briefings).orderBy(desc(briefings.briefingDate));
   const latest = rows[0];

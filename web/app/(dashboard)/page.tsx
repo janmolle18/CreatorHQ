@@ -1,5 +1,16 @@
 import Link from "next/link";
-import { briefings, clips, db, metricsSnapshots, posts, settings, type Clip, type Post } from "@creatorhq/db";
+import {
+  briefings,
+  clips,
+  metricsSnapshots,
+  posts,
+  settings,
+  type Clip,
+  type Post,
+  withTenant,
+  type TenantDB,
+} from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import {
   DEFAULT_TIMEZONE,
   formatInTz,
@@ -67,6 +78,14 @@ function ersteSaetze(text: string, anzahl = 2): string {
 }
 
 export default async function OverviewPage() {
+  const session = await requireSession();
+  // Der gesamte Seitenkoerper laeuft in der Mandantengrenze. Ohne sie
+  // liefert die Datenbank null Zeilen — die Seite waere leer statt falsch.
+  return withTenant(session.tenantId, (db) => OverviewPageInhalt(db));
+}
+
+async function OverviewPageInhalt(db: TenantDB,
+) {
   const [config] = await db.select().from(settings).limit(1);
   const timeZone = config?.timezone ?? DEFAULT_TIMEZONE;
   const today = todayInTz(timeZone);

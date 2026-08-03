@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { clips, db, metricsSnapshots, posts } from "@creatorhq/db";
+import {
+  clips,
+  metricsSnapshots,
+  posts,
+  withTenant,
+  type TenantDB,
+} from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import { PLATFORM_LABELS, PLATFORM_SHORT, type PublishPlatform } from "@creatorhq/shared";
 import { and, asc, eq, gte, isNull, isNotNull } from "drizzle-orm";
 import { BarList, LineChart, type LineSeries } from "@/components/charts";
@@ -14,11 +21,20 @@ function isoDaysAgo(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-export default async function AnalyticsPage({
+export default async function AnalyticsPage(props: Parameters<typeof AnalyticsPageInhalt>[0]) {
+  const session = await requireSession();
+  // Der gesamte Seitenkoerper laeuft in der Mandantengrenze. Ohne sie
+  // liefert die Datenbank null Zeilen — die Seite waere leer statt falsch.
+  return withTenant(session.tenantId, (db) => AnalyticsPageInhalt(props, db));
+}
+
+async function AnalyticsPageInhalt({
   searchParams,
 }: {
   searchParams: Promise<{ days?: string }>;
-}) {
+},
+  db: TenantDB,
+) {
   const params = await searchParams;
   const days = PERIODS.includes(Number(params.days) as (typeof PERIODS)[number])
     ? Number(params.days)
