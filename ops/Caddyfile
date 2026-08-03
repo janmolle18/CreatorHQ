@@ -1,0 +1,34 @@
+# Caddy holt und erneuert das HTTPS-Zertifikat selbst (Let's Encrypt), sobald
+# die Domain auf diesen Server zeigt. Kein Zertifikats-Gefummel, keine Cronjobs.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Uploads: Ein Instagram-Import darf bis 500 MB groß sein — der Standard
+	# von 10 MB hätte jeden Import kommentarlos abgeschnitten.
+	request_body {
+		max_size 512MB
+	}
+
+	reverse_proxy web:3000 {
+		# Die App baut ihre OAuth-Rückleitungen aus diesen Kopfzeilen. Ohne sie
+		# landet der Creator nach erfolgreicher Zustimmung auf einer toten Seite.
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+
+		# Ein Upload von einem halben Gigabyte darf dauern.
+		transport http {
+			read_timeout 30m
+			write_timeout 30m
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+}

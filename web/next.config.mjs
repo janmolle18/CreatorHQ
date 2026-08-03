@@ -12,7 +12,7 @@
  * dann gar nicht mehr.
  */
 function allowedOrigins() {
-  const erlaubt = ["localhost:3000", "127.0.0.1:3000"];
+  const erlaubt = ["localhost:3001", "127.0.0.1:3001"];
 
   const basis = process.env.APP_BASE_URL?.trim();
   if (basis) {
@@ -24,12 +24,21 @@ function allowedOrigins() {
     }
   }
 
-  // Übergangszustand: wechselnder Quick-Tunnel, feste Domain steht noch aus.
+  // Übergangszustand für die Entwicklung: wechselnder Quick-Tunnel, feste
+  // Domain steht noch aus. Im Produktionsbetrieb NIE — dort ist ein fehlendes
+  // APP_BASE_URL ein Fehler und darf nicht in eine Wildcard-Freigabe kippen.
+  if (process.env.NODE_ENV === "production") return erlaubt;
   return [...erlaubt, "*.trycloudflare.com"];
 }
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Eigenständiges Ausgabepaket: Das Produktionsbild braucht dadurch weder
+  // node_modules noch den Quellbaum — nur den Ordner .next/standalone.
+  output: "standalone",
+  // Im Monorepo muss Next wissen, wo die Wurzel liegt, sonst fehlen die
+  // Workspace-Pakete im Ausgabepaket.
+  outputFileTracingRoot: new URL("..", import.meta.url).pathname,
   // Workspace-Pakete (TS-Quelle) transpilieren
   transpilePackages: ["@creatorhq/db", "@creatorhq/shared"],
   // Native/Server-only Pakete nicht bundeln

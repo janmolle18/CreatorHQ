@@ -1,0 +1,133 @@
+name: creatorhq-prod
+
+# Produktionsbetrieb auf einem Server. Unterschiede zur Entwicklung:
+#
+#   * Caddy davor — holt und erneuert das HTTPS-Zertifikat selbst. Das ist der
+#     Grund, warum hier kein Tunnel und kein Zertifikats-Gefummel steht.
+#   * Nur 80 und 443 sind nach außen offen. Datenbank, Redis und Speicher
+#     hören ausschließlich im internen Netz — sie haben KEIN ports-Feld.
+#   * Web und Worker laufen als Bilder, nicht aus gemountetem Quellcode.
+#
+# Start:  docker compose -f docker-compose.prod.yml up -d --build
+# Log:    docker compose -f docker-compose.prod.yml logs -f web worker
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Muss auf die echte Domain zeigen — Caddy beantragt das Zertifikat dafür.
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        # Beim BAU nötig, nicht erst zur Laufzeit: Next backt die erlaubten
+        # Absender für Server Actions ins Paket.
+        APP_BASE_URL: ${APP_BASE_URL}
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      DATABASE_URL: postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    restart: unless-stopped
+    # Whisper und ffmpeg dürfen die Maschine nie so auslasten, dass Datenbank
+    # und Web verhungern. Bei Speichermangel stirbt nur der Worker-Container.
+    cpus: 3
+    mem_limit: 3g
+    env_file: .env.prod
+    environment:
+      DATABASE_URL: postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      # Lang laufende Aufträge belegen je eine Verbindung; der Takt braucht
+      # daneben eine freie.
+      DB_POOL_MAX: 20
+      TMP_DIR: /app/tmp
+    volumes:
+      - worker_tmp:/app/tmp
+      - ./backups:/app/backups
+      - whisper_cache:/root/.cache/huggingface
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+volumes:
+  pg_data:
+  redis_data:
+  minio_data:
+  worker_tmp:
+  whisper_cache:
+  caddy_data:
+  caddy_config:
