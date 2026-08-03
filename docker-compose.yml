@@ -1,0 +1,99 @@
+name: creatorhq
+
+# Host-Ports sind gegenüber DavidHQ verschoben (5434/6381/9004/9005), damit beide
+# Projekte gleichzeitig laufen können. Alle Ports binden nur an
+# 127.0.0.1 — nichts ist im LAN erreichbar (ClipPilot-Schwäche behoben).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./data/redis:/data
+    ports:
+      - "127.0.0.1:6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      # Named Volume statt Bind-Mount: vermeidet "resource deadlock avoided"
+      # bei großen Uploads auf dem virtualisierten Mac-Dateisystem (ClipPilot-Erfahrung).
+      - minio_data:/data
+    ports:
+      - "127.0.0.1:9004:9000"
+      - "127.0.0.1:9005:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    restart: unless-stopped
+    # Whisper/ffmpeg dürfen die VM nie so auslasten, dass Postgres/Redis (und damit
+    # das Dashboard) verhungern. Bei OOM stirbt nur der Worker-Container, nicht die VM.
+    # 2,5 GB: small-Modell (~1 GB) + Node + Page-Cache-Bursts beim Modell-Laden.
+    cpus: 3
+    mem_limit: 2560m
+    env_file: .env
+    environment:
+      # Im Container gelten die Service-Namen statt der Host-Ports.
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      TMP_DIR: /app/tmp
+      COOKIES_PATH: /app/cookies.txt
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - ./tmp:/app/tmp
+      # Nächtliche Postgres-Dumps (03:30) landen auf dem Host.
+      - ./backups:/app/backups
+      # Source gemountet → Code-Änderungen ohne Rebuild (Container nur neu starten)
+      - ./worker/src:/app/worker/src
+      - ./worker/whisper/transcribe.py:/app/worker/whisper/transcribe.py
+      - ./db/src:/app/db/src
+      - ./shared/src:/app/shared/src
+      # Optionale YouTube-Cookies (für zuverlässige Downloads eigener Inhalte)
+      - ./cookies.txt:/app/cookies.txt:ro
+      # Whisper-Modell-Cache (einmal laden, dann persistent)
+      - ./data/whisper:/root/.cache/huggingface
+
+volumes:
+  minio_data:

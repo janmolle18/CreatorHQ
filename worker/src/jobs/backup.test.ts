@@ -1,0 +1,32 @@
+import { describe, expect, test } from "vitest";
+import { backupsToPrune } from "./backup.ts";
+
+describe("backupsToPrune", () => {
+  test("löscht die ältesten über der Retention", () => {
+    const names = Array.from({ length: 16 }, (_, i) =>
+      `creatorhq-2026-07-${String(i + 1).padStart(2, "0")}.sql.gz`
+    );
+    const prune = backupsToPrune(names, 14);
+    expect(prune).toEqual(["creatorhq-2026-07-01.sql.gz", "creatorhq-2026-07-02.sql.gz"]);
+  });
+
+  test("unter der Retention wird nichts gelöscht", () => {
+    expect(backupsToPrune(["creatorhq-2026-07-30.sql.gz"], 14)).toEqual([]);
+  });
+
+  test("fremde Dateien im Ordner werden ignoriert", () => {
+    const prune = backupsToPrune(
+      [".DS_Store", "notizen.txt", "creatorhq-2026-07-01.sql.gz", "creatorhq-2026-07-02.sql.gz"],
+      1
+    );
+    expect(prune).toEqual(["creatorhq-2026-07-01.sql.gz"]);
+  });
+
+  test("Monatswechsel sortiert chronologisch (ISO-Namen)", () => {
+    const prune = backupsToPrune(
+      ["creatorhq-2026-08-01.sql.gz", "creatorhq-2026-07-31.sql.gz", "creatorhq-2026-07-30.sql.gz"],
+      2
+    );
+    expect(prune).toEqual(["creatorhq-2026-07-30.sql.gz"]);
+  });
+});

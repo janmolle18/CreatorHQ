@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* ── Design-Tokens: helles, typografie-getriebenes Swiss/Editorial-Minimal ──
+   Keine Icons, keine Emojis, keine Component-Library. Farbe nur semantisch. */
+@theme {
+  --color-paper: #fcfcfa;
+  --color-ink: #161615;
+  --color-ink-soft: #5f5e59;
+  /* 4,6:1 auf Papier. Vorher #a3a29b — das waren 2,5:1 und damit unter der
+     Lesbarkeitsnorm, ausgerechnet für Labels, Tabellenköpfe und Platzhalter. */
+  --color-ink-faint: #74736d;
+  --color-hairline: #e4e3dd;
+
+  --color-ok: #15803c;
+  --color-warn: #966608;
+  --color-err: #b3261e;
+
+  /* Zwei benannte Schriftrollen neben Tailwinds Skala: „label" ist die
+     Kapitälchen-Hausschrift, „meta" der Nebentext. Ersetzt die verstreuten
+     text-[10px]/[11px]/[13px]. Tailwinds eigene Größen bleiben unangetastet. */
+  --text-label: 0.6875rem;
+  --text-meta: 0.8125rem;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+}
+
+/* Abstands-Rhythmus (Konvention, keine Klasse): Seitenabschnitte mb-14,
+   Blöcke innerhalb eines Abschnitts mb-6, Zeilen gap-3. Bitte nicht
+   zwischen mb-10/mb-12/mb-14 mischen. */
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-ink);
+    color: var(--color-paper);
+  }
+
+  /* Ein sichtbarer Fokus für die Tastaturbedienung — global, damit keine
+     Komponente ihn vergessen kann. :where() hält die Spezifität bei 0,
+     einzelne Bausteine können ihn also weiterhin überschreiben. */
+  :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+    border-radius: 1px;
+  }
+}
+
+/* Zahlen in Tabellen/Stats laufen immer in Tabellenziffern. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tabellen als Kartenliste auf dem Handy (opt-in über <Table cards>).
+   Ohne das müssten fünfspaltige Tabellen seitwärts gescrollt werden. */
+@media (max-width: 767px) {
+  .table-cards,
+  .table-cards tbody,
+  .table-cards tr,
+  .table-cards td {
+    display: block;
+  }
+
+  .table-cards thead {
+    display: none;
+  }
+
+  .table-cards tr {
+    padding: 0.75rem 0;
+  }
+
+  .table-cards td {
+    padding: 0.25rem 0;
+  }
+
+  /* Spaltenname vor den Wert — sonst verliert die gestapelte Zeile ihre Bedeutung. */
+  .table-cards td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.125rem;
+    font-size: var(--text-label);
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+  }
+}

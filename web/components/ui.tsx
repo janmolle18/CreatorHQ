@@ -1,0 +1,292 @@
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from "react";
+import type { StatusMeta } from "@/lib/status";
+
+// Selbstgebaute typografische Primitive — keine Component-Library, keine Icons.
+//
+// Layout-Regel für Zeilen (gilt überall, ist bewusst KEINE Komponente, weil
+// Tailwind keine Klassen aus dynamischen Strings erzeugt): eine Zeile ist
+// einspaltig und bekommt ihre festen Spalten erst ab `md:`. Also
+//   `grid gap-x-6 gap-y-2 md:grid-cols-[150px_1fr]`
+// statt `flex` mit `w-32 shrink-0` — Letzteres bricht auf dem Handy.
+// Textspalten immer mit `min-w-0`, Bilder immer mit `max-w-…`.
+
+export function PageHeader({
+  kicker,
+  title,
+  description,
+  action,
+}: {
+  kicker?: string;
+  title: string;
+  description?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <header className="mb-10 flex flex-wrap items-end justify-between gap-6 border-b border-hairline pb-6">
+      <div>
+        {kicker && (
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-faint">
+            {kicker}
+          </p>
+        )}
+        <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{title}</h1>
+        {description && (
+          <p className="mt-3 max-w-xl text-sm text-ink-soft">{description}</p>
+        )}
+      </div>
+      {action}
+    </header>
+  );
+}
+
+export function SectionTitle({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="mb-4 border-b border-ink pb-2 text-[11px] font-medium uppercase tracking-[0.18em]">
+      {children}
+    </h2>
+  );
+}
+
+export function Stat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: ReactNode;
+  hint?: string;
+}) {
+  return (
+    <div className="py-5 pr-6">
+      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-faint">
+        {label}
+      </p>
+      <p className="tnum mt-2 text-4xl font-semibold tracking-tight">{value}</p>
+      {hint && <p className="mt-1 text-xs text-ink-soft">{hint}</p>}
+    </div>
+  );
+}
+
+/**
+ * `cards`: Auf dem Handy wird die Tabelle zur Kartenliste, statt seitwärts
+ * zu scrollen. Voraussetzung ist, dass die Zellen ein `label` mitgeben —
+ * deshalb bewusst opt-in und nicht der Standard.
+ */
+export function Table({
+  head,
+  cards = false,
+  children,
+}: {
+  head: string[];
+  cards?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cards ? "" : "overflow-x-auto"}>
+      <table className={`w-full border-collapse text-sm ${cards ? "table-cards" : ""}`}>
+        <thead>
+          <tr className="border-b border-ink">
+            {head.map((label, index) => (
+              <th
+                key={label || `spalte-${index}`}
+                scope="col"
+                className="py-2 pr-6 text-left text-label font-medium uppercase tracking-[0.18em] text-ink-faint"
+              >
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-hairline">{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+export function Td({
+  children,
+  label,
+  className = "",
+}: {
+  children?: ReactNode;
+  /** Spaltenname für die Kartenansicht auf dem Handy (siehe Table `cards`). */
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <td data-label={label} className={`py-3 pr-6 align-top ${className}`}>
+      {children}
+    </td>
+  );
+}
+
+export function EmptyState({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="border border-dashed border-hairline px-6 py-14 text-center">
+      <p className="text-sm font-medium">{title}</p>
+      {hint && <p className="mt-1 text-sm text-ink-soft">{hint}</p>}
+    </div>
+  );
+}
+
+export type ButtonVariant = "primary" | "ghost" | "danger";
+
+/**
+ * Die Knopf-Optik als Funktion, damit ConfirmButton, SubmitButton und
+ * knopfähnliche Links dieselbe Quelle benutzen. Vorher war sie an drei
+ * Stellen nachgebaut — mit auseinanderlaufenden Hover-Tönen.
+ *
+ * Klare Aktions-Hierarchie: primär = schwarz gefüllt, sekundär = sichtbarer
+ * Rahmen mit Hover-Fläche, destruktiv = rot gerahmt.
+ */
+export function buttonClasses(variant: ButtonVariant = "primary", extra = ""): string {
+  const styles =
+    variant === "primary"
+      ? "bg-ink text-paper hover:bg-ink/85"
+      : variant === "danger"
+        ? "border border-err/40 text-err hover:border-err hover:bg-err/[0.06]"
+        : "border border-ink/25 text-ink hover:border-ink hover:bg-ink/[0.04]";
+  return `inline-flex min-h-11 items-center justify-center px-4 text-meta font-medium tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${styles} ${extra}`;
+}
+
+export function Button({
+  variant = "primary",
+  className = "",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
+  return <button className={buttonClasses(variant, className)} {...props} />;
+}
+
+/**
+ * Textknopf für Nebenaktionen („Erneut clippen", „Verwerfen"). War bisher an
+ * sechs Stellen nachgebaut. Die Mindesthöhe macht ihn auf dem Handy treffbar.
+ */
+export function TextButton({
+  className = "",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      className={`-mx-2 inline-flex min-h-11 items-center px-2 text-label font-medium uppercase tracking-[0.14em] text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
+      {...props}
+    />
+  );
+}
+
+const STATUS_COLOR = {
+  ok: "text-ok",
+  warn: "text-warn",
+  err: "text-err",
+  muted: "text-ink-faint",
+} as const;
+
+export function StatusText({
+  tone,
+  children,
+}: {
+  tone: keyof typeof STATUS_COLOR;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${STATUS_COLOR[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.18em] text-ink-faint">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+const FIELD_BASE =
+  "w-full border-0 border-b border-hairline bg-transparent py-2 text-[15px] placeholder:text-ink-faint focus:border-ink";
+
+export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  return <input className={`${FIELD_BASE} ${className}`} {...props} />;
+}
+
+export function Textarea({
+  className = "",
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea className={`${FIELD_BASE} resize-y leading-relaxed ${className}`} {...props} />;
+}
+
+export function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select className={`${FIELD_BASE} ${className}`} {...props} />;
+}
+
+/** Beschriftete Auswahlgruppe — mit fieldset/legend statt loser Absatz-Überschrift. */
+export function CheckboxGroup({
+  legend,
+  children,
+  className = "",
+}: {
+  legend: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <fieldset className={className}>
+      <legend className="mb-2 text-label font-medium uppercase tracking-[0.18em] text-ink-faint">
+        {legend}
+      </legend>
+      <div className="flex flex-wrap gap-x-5 gap-y-2">{children}</div>
+    </fieldset>
+  );
+}
+
+export function Checkbox({
+  label,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+  return (
+    <label className="inline-flex min-h-11 items-center gap-2 text-meta">
+      <input type="checkbox" className="size-4 accent-ink" {...props} />
+      {label}
+    </label>
+  );
+}
+
+/** Abgesetzte Fläche für gruppierte Inhalte — bewusst flach, nur Haarlinie. */
+export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`border border-hairline p-5 ${className}`}>{children}</div>;
+}
+
+export function Badge({ children }: { children: ReactNode }) {
+  return (
+    <span className="border border-hairline px-2 py-0.5 text-label uppercase tracking-[0.14em] text-ink-soft">
+      {children}
+    </span>
+  );
+}
+
+/** Status aus der Registry (web/lib/status.ts) — nie roh aus der Datenbank. */
+export function Status({ meta }: { meta: StatusMeta }) {
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-x-2">
+      <StatusText tone={meta.tone}>{meta.label}</StatusText>
+      {meta.hint && <span className="text-xs text-ink-soft">{meta.hint}</span>}
+    </span>
+  );
+}
+
+/** Platzhalter für Inhalte, die gerade entstehen (z. B. noch nicht fertiges Video). */
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse bg-hairline/60 ${className}`} aria-hidden="true" />;
+}

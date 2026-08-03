@@ -1,0 +1,38 @@
+{
+  "name": "creatorhq",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Creator Dashboard für David (@davidvorkamera): Clip-Pipeline, Multi-Plattform-Publishing, Analytics, KI-Briefing, Content-Planung",
+  "workspaces": [
+    "db",
+    "shared",
+    "worker",
+    "web"
+  ],
+  "scripts": {
+    "check": "npm run typecheck --workspaces --if-present && vitest run",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run -w @creatorhq/db generate",
+    "db:migrate": "npm run -w @creatorhq/db migrate",
+    "db:studio": "npm run -w @creatorhq/db studio",
+    "web:dev": "npm run -w @creatorhq/web dev",
+    "web:build": "npm run -w @creatorhq/web build",
+    "web:start": "npm run -w @creatorhq/web start",
+    "web:deploy": "npm run web:build && launchctl kickstart -k gui/$(id -u)/com.creatorhq.web",
+    "tunnel:url": "grep -o 'https://[a-z0-9-]*\\.trycloudflare\\.com' logs/tunnel.log | tail -1",
+    "link:deploy": "npx --yes vercel deploy --prod --yes --cwd ops/link",
+    "worker:dev": "npm run -w @creatorhq/worker dev",
+    "up": "docker compose up -d",
+    "down": "docker compose down",
+    "logs": "docker compose logs -f"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
