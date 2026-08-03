@@ -12,8 +12,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+      # Für db/init/01-app-role.sh — die Rolle, unter der die App verbindet.
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
+      # Läuft nur beim allerersten Start eines leeren Datenverzeichnisses.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:5434:5432"
     healthcheck:

@@ -1,6 +1,6 @@
 {
-  "id": "da1f4ee2-e85c-442c-b443-65e87de89d37",
-  "prevId": "1c917f0a-7b77-45a1-8ee5-45c03d58fcf1",
+  "id": "e375f837-2a4c-4df8-944c-580b25b1b830",
+  "prevId": "317e9244-0a54-4653-a7c1-1eca3302c6fd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -14,6 +14,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "briefing_date": {
           "name": "briefing_date",
@@ -90,15 +96,30 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "briefings_tenant_id_tenants_id_fk": {
+          "name": "briefings_tenant_id_tenants_id_fk",
+          "tableFrom": "briefings",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "briefings_briefing_date_unique": {
-          "name": "briefings_briefing_date_unique",
-          "nullsNotDistinct": false,
+        "uq_briefing_tenant_date": {
+          "name": "uq_briefing_tenant_date",
           "columns": [
+            "tenant_id",
             "briefing_date"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -115,6 +136,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "kind": {
           "name": "kind",
@@ -183,31 +210,44 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "calendar_items_idea_id_ideas_id_fk": {
-          "name": "calendar_items_idea_id_ideas_id_fk",
+        "calendar_items_tenant_id_tenants_id_fk": {
+          "name": "calendar_items_tenant_id_tenants_id_fk",
           "tableFrom": "calendar_items",
-          "tableTo": "ideas",
           "columnsFrom": [
-            "idea_id"
+            "tenant_id"
           ],
+          "tableTo": "tenants",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "calendar_items_idea_id_ideas_id_fk": {
+          "name": "calendar_items_idea_id_ideas_id_fk",
+          "tableFrom": "calendar_items",
+          "columnsFrom": [
+            "idea_id"
+          ],
+          "tableTo": "ideas",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "set null"
         },
         "calendar_items_post_id_posts_id_fk": {
           "name": "calendar_items_post_id_posts_id_fk",
           "tableFrom": "calendar_items",
-          "tableTo": "posts",
           "columnsFrom": [
             "post_id"
           ],
+          "tableTo": "posts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
@@ -226,6 +266,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "source_video_id": {
           "name": "source_video_id",
@@ -302,6 +348,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "thumb_path": {
+          "name": "thumb_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "targets": {
           "name": "targets",
           "type": "publish_platform[]",
@@ -340,18 +392,31 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "clips_source_video_id_source_videos_id_fk": {
-          "name": "clips_source_video_id_source_videos_id_fk",
+        "clips_tenant_id_tenants_id_fk": {
+          "name": "clips_tenant_id_tenants_id_fk",
           "tableFrom": "clips",
-          "tableTo": "source_videos",
           "columnsFrom": [
-            "source_video_id"
+            "tenant_id"
           ],
+          "tableTo": "tenants",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "clips_source_video_id_source_videos_id_fk": {
+          "name": "clips_source_video_id_source_videos_id_fk",
+          "tableFrom": "clips",
+          "columnsFrom": [
+            "source_video_id"
+          ],
+          "tableTo": "source_videos",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -370,6 +435,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "platform": {
           "name": "platform",
@@ -458,29 +529,43 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "comments_post_id_posts_id_fk": {
-          "name": "comments_post_id_posts_id_fk",
+        "comments_tenant_id_tenants_id_fk": {
+          "name": "comments_tenant_id_tenants_id_fk",
           "tableFrom": "comments",
-          "tableTo": "posts",
           "columnsFrom": [
-            "post_id"
+            "tenant_id"
           ],
+          "tableTo": "tenants",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "comments_post_id_posts_id_fk": {
+          "name": "comments_post_id_posts_id_fk",
+          "tableFrom": "comments",
+          "columnsFrom": [
+            "post_id"
+          ],
+          "tableTo": "posts",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "uq_comments_platform_external": {
-          "name": "uq_comments_platform_external",
-          "nullsNotDistinct": false,
+        "uq_comments_tenant_platform_external": {
+          "name": "uq_comments_tenant_platform_external",
           "columns": [
+            "tenant_id",
             "platform",
             "external_comment_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -497,6 +582,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "title": {
           "name": "title",
@@ -568,35 +659,131 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "ideas_briefing_id_briefings_id_fk": {
-          "name": "ideas_briefing_id_briefings_id_fk",
+        "ideas_tenant_id_tenants_id_fk": {
+          "name": "ideas_tenant_id_tenants_id_fk",
           "tableFrom": "ideas",
-          "tableTo": "briefings",
           "columnsFrom": [
-            "briefing_id"
+            "tenant_id"
           ],
+          "tableTo": "tenants",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "ideas_briefing_id_briefings_id_fk": {
+          "name": "ideas_briefing_id_briefings_id_fk",
+          "tableFrom": "ideas",
+          "columnsFrom": [
+            "briefing_id"
+          ],
+          "tableTo": "briefings",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "set null"
         },
         "ideas_comment_id_comments_id_fk": {
           "name": "ideas_comment_id_comments_id_fk",
           "tableFrom": "ideas",
-          "tableTo": "comments",
           "columnsFrom": [
             "comment_id"
           ],
+          "tableTo": "comments",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.memberships": {
+      "name": "memberships",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "membership_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'owner'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "memberships_tenant_id_tenants_id_fk": {
+          "name": "memberships_tenant_id_tenants_id_fk",
+          "tableFrom": "memberships",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "memberships_user_id_users_id_fk": {
+          "name": "memberships_user_id_users_id_fk",
+          "tableFrom": "memberships",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "tableTo": "users",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_membership_tenant_user": {
+          "name": "uq_membership_tenant_user",
+          "columns": [
+            "tenant_id",
+            "user_id"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -611,6 +798,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "snapshot_date": {
           "name": "snapshot_date",
@@ -637,6 +830,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "source_video_id": {
+          "name": "source_video_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "metrics": {
           "name": "metrics",
           "type": "jsonb",
@@ -654,43 +853,70 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "metrics_snapshots_account_id_social_accounts_id_fk": {
-          "name": "metrics_snapshots_account_id_social_accounts_id_fk",
+        "metrics_snapshots_tenant_id_tenants_id_fk": {
+          "name": "metrics_snapshots_tenant_id_tenants_id_fk",
           "tableFrom": "metrics_snapshots",
-          "tableTo": "social_accounts",
           "columnsFrom": [
-            "account_id"
+            "tenant_id"
           ],
+          "tableTo": "tenants",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "metrics_snapshots_account_id_social_accounts_id_fk": {
+          "name": "metrics_snapshots_account_id_social_accounts_id_fk",
+          "tableFrom": "metrics_snapshots",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "tableTo": "social_accounts",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "metrics_snapshots_post_id_posts_id_fk": {
           "name": "metrics_snapshots_post_id_posts_id_fk",
           "tableFrom": "metrics_snapshots",
-          "tableTo": "posts",
           "columnsFrom": [
             "post_id"
           ],
+          "tableTo": "posts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "metrics_snapshots_source_video_id_source_videos_id_fk": {
+          "name": "metrics_snapshots_source_video_id_source_videos_id_fk",
+          "tableFrom": "metrics_snapshots",
+          "columnsFrom": [
+            "source_video_id"
+          ],
+          "tableTo": "source_videos",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "uq_snapshot_date_account_post": {
           "name": "uq_snapshot_date_account_post",
-          "nullsNotDistinct": true,
           "columns": [
             "snapshot_date",
             "account_id",
-            "post_id"
-          ]
+            "post_id",
+            "source_video_id"
+          ],
+          "nullsNotDistinct": true
         }
       },
       "policies": {},
@@ -707,6 +933,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "clip_id": {
           "name": "clip_id",
@@ -795,42 +1027,55 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "posts_clip_id_clips_id_fk": {
-          "name": "posts_clip_id_clips_id_fk",
+        "posts_tenant_id_tenants_id_fk": {
+          "name": "posts_tenant_id_tenants_id_fk",
           "tableFrom": "posts",
-          "tableTo": "clips",
           "columnsFrom": [
-            "clip_id"
+            "tenant_id"
           ],
+          "tableTo": "tenants",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "posts_clip_id_clips_id_fk": {
+          "name": "posts_clip_id_clips_id_fk",
+          "tableFrom": "posts",
+          "columnsFrom": [
+            "clip_id"
+          ],
+          "tableTo": "clips",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "posts_account_id_social_accounts_id_fk": {
           "name": "posts_account_id_social_accounts_id_fk",
           "tableFrom": "posts",
-          "tableTo": "social_accounts",
           "columnsFrom": [
             "account_id"
           ],
+          "tableTo": "social_accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "uq_posts_clip_platform": {
           "name": "uq_posts_clip_platform",
-          "nullsNotDistinct": false,
           "columns": [
             "clip_id",
             "platform"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -841,19 +1086,17 @@
       "name": "settings",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
           "primaryKey": true,
-          "notNull": true,
-          "default": "'default'"
+          "notNull": true
         },
         "creator_name": {
           "name": "creator_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'David'"
+          "notNull": true
         },
         "youtube_channel_id": {
           "name": "youtube_channel_id",
@@ -876,6 +1119,13 @@
         },
         "auto_discovery": {
           "name": "auto_discovery",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "auto_publish": {
+          "name": "auto_publish",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
@@ -904,7 +1154,21 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "settings_tenant_id_tenants_id_fk": {
+          "name": "settings_tenant_id_tenants_id_fk",
+          "tableFrom": "settings",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -921,6 +1185,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "platform": {
           "name": "platform",
@@ -1017,15 +1287,30 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "social_accounts_tenant_id_tenants_id_fk": {
+          "name": "social_accounts_tenant_id_tenants_id_fk",
+          "tableFrom": "social_accounts",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "social_accounts_platform_unique": {
-          "name": "social_accounts_platform_unique",
-          "nullsNotDistinct": false,
+        "uq_account_tenant_platform": {
+          "name": "uq_account_tenant_platform",
           "columns": [
+            "tenant_id",
             "platform"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -1042,6 +1327,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "source_kind": {
           "name": "source_kind",
@@ -1123,16 +1414,160 @@
         }
       },
       "indexes": {},
+      "foreignKeys": {
+        "source_videos_tenant_id_tenants_id_fk": {
+          "name": "source_videos_tenant_id_tenants_id_fk",
+          "tableFrom": "source_videos",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_source_tenant_platform_external": {
+          "name": "uq_source_tenant_platform_external",
+          "columns": [
+            "tenant_id",
+            "platform",
+            "external_id"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tenants": {
+      "name": "tenants",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "tenant_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'trial'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "uq_source_platform_external": {
-          "name": "uq_source_platform_external",
-          "nullsNotDistinct": false,
+        "tenants_slug_unique": {
+          "name": "tenants_slug_unique",
           "columns": [
-            "platform",
-            "external_id"
-          ]
+            "slug"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email_verified_at": {
+          "name": "email_verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_platform_admin": {
+          "name": "is_platform_admin",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "columns": [
+            "email"
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -1212,6 +1647,14 @@
         "discarded"
       ]
     },
+    "public.membership_role": {
+      "name": "membership_role",
+      "schema": "public",
+      "values": [
+        "owner",
+        "editor"
+      ]
+    },
     "public.post_status": {
       "name": "post_status",
       "schema": "public",
@@ -1262,15 +1705,26 @@
         "downloaded",
         "clipping",
         "clipped",
-        "failed"
+        "failed",
+        "reference"
+      ]
+    },
+    "public.tenant_status": {
+      "name": "tenant_status",
+      "schema": "public",
+      "values": [
+        "trial",
+        "active",
+        "suspended",
+        "cancelled"
       ]
     }
   },
   "schemas": {},
+  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
-  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

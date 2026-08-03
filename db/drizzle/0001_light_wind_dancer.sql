@@ -1,1 +1,0 @@
-ALTER TABLE "source_videos" ADD COLUMN "transcript_json" jsonb;

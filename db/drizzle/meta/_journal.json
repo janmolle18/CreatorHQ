@@ -5,36 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1785430329770,
-      "tag": "0000_pink_terror",
+      "when": 1785775440836,
+      "tag": "0000_hesitant_ikaris",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1785510970647,
-      "tag": "0001_light_wind_dancer",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1785529506582,
-      "tag": "0002_cloudy_rhino",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1785551938338,
-      "tag": "0003_modern_captain_america",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1785696964623,
-      "tag": "0004_uneven_purple_man",
+      "when": 1785775572485,
+      "tag": "0001_rls",
       "breakpoints": true
     }
   ]
