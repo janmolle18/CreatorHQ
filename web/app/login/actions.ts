@@ -176,7 +176,7 @@ export async function registerAction(formData: FormData): Promise<void> {
   });
 
   await createSession(userId, tenantId);
-  redirect("/?willkommen=1");
+  redirect("/verbinden?willkommen=1");
 }
 
 export async function logoutAction(): Promise<void> {

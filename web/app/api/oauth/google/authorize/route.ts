@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       appUrl(
         req,
-        "/accounts?error=" +
+        "/verbinden?error=" +
           encodeURIComponent("YouTube ist noch nicht eingerichtet — wir müssen das freischalten")
       )
     );

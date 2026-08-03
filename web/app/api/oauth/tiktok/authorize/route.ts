@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       appUrl(
         req,
-        "/accounts?error=" +
+        "/verbinden?error=" +
           encodeURIComponent("TikTok ist noch nicht eingerichtet — wir müssen das freischalten")
       )
     );

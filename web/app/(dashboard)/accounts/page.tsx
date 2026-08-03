@@ -1,5 +1,7 @@
-import { db, socialAccounts, type SocialAccount } from "@creatorhq/db";
+import Link from "next/link";
+import { socialAccounts, type SocialAccount } from "@creatorhq/db";
 import { PLATFORM_LABELS, PUBLISH_PLATFORMS, type PublishPlatform } from "@creatorhq/shared";
+import { mitMandant } from "@/lib/auth";
 import { Button, Field, Input, PageHeader, StatusText } from "@/components/ui";
 import { savePostingPlanAction } from "./actions";
 
@@ -15,40 +17,24 @@ const STATUS_LABEL: Record<
   disabled: { label: "Pausiert", tone: "warn" },
 };
 
-const CONNECT: Record<PublishPlatform, { href: string | null; hint: string }> = {
-  tiktok: {
-    href: "/api/oauth/tiktok/authorize",
-    hint: "Content Posting API (Sandbox) — ohne Audit landen Posts als Entwurf in Davids Inbox.",
-  },
-  youtube: {
-    href: "/api/oauth/google/authorize",
-    hint: "Bis zum bestandenen API-Audit lädt die API privat hoch — Veröffentlichung dann in YouTube Studio (2 Klicks).",
-  },
-  instagram: {
-    href: "/api/oauth/instagram/authorize",
-    hint: "Instagram-Login (Dev-Modus): David muss als Instagram-Tester bestätigt sein; Reels brauchen die öffentliche Medien-URL (Tunnel/Domain).",
-  },
-};
-
 export default async function AccountsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; connected?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
-  const { saved, connected, error } = await searchParams;
-  const rows = await db.select().from(socialAccounts);
+  const { saved, error } = await searchParams;
+  const rows = await mitMandant((tx) => tx.select().from(socialAccounts));
   const byPlatform = new Map(rows.map((row) => [row.platform, row]));
 
   return (
     <>
       <PageHeader
-        kicker="Verbindungen"
-        title="Accounts"
-        description="Plattform-Verbindungen und Posting-Plan. Slots gelten in der Zeitzone aus den Einstellungen; sie steuern auch den Manual-Fallback-Zeitplan."
+        kicker="Zeitplan"
+        title="Wann gepostet wird"
+        description="Uhrzeiten und wie viele Videos pro Tag — je Plattform. Die Zeiten gelten in der Zeitzone aus den Einstellungen."
         action={
           <div className="flex gap-4">
             {saved && <StatusText tone="ok">Plan gespeichert</StatusText>}
-            {connected && <StatusText tone="ok">{connected} verbunden</StatusText>}
             {error && <StatusText tone="err">{error}</StatusText>}
           </div>
         }
@@ -58,7 +44,6 @@ export default async function AccountsPage({
         {PUBLISH_PLATFORMS.map((platform) => {
           const account = byPlatform.get(platform);
           const status = STATUS_LABEL[account?.status ?? "disconnected"];
-          const connect = CONNECT[platform];
           return (
             <section key={platform} className="grid gap-8 py-10 md:grid-cols-[220px_1fr]">
               <div>
@@ -81,19 +66,15 @@ export default async function AccountsPage({
                     {account.lastError.slice(0, 120)}
                   </p>
                 )}
-                <div className="mt-4">
-                  {connect.href ? (
-                    <a
-                      href={connect.href}
-                      className="inline-block bg-ink px-4 py-2 text-[13px] font-medium tracking-wide text-paper transition-colors hover:bg-ink/80"
-                    >
-                      {account?.status === "connected" ? "Neu verbinden" : "Verbinden"}
-                    </a>
-                  ) : (
-                    <StatusText tone="muted">Verbinden ab Phase 7</StatusText>
-                  )}
-                </div>
-                <p className="mt-3 max-w-[220px] text-xs text-ink-soft">{connect.hint}</p>
+                {account?.status !== "connected" && (
+                  <p className="mt-4 max-w-[220px] text-xs text-ink-soft">
+                    Noch nicht verbunden — das machst du unter{" "}
+                    <Link href="/verbinden" className="underline underline-offset-4">
+                      Verbinden
+                    </Link>
+                    . Die Zeiten kannst du trotzdem schon festlegen.
+                  </p>
+                )}
               </div>
 
               <form action={savePostingPlanAction} className="max-w-md space-y-6">

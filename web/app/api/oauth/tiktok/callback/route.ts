@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const fail = (message: string) =>
     NextResponse.redirect(
-      appUrl(req, `/accounts?error=${encodeURIComponent(message.slice(0, 120))}`)
+      appUrl(req, `/verbinden?error=${encodeURIComponent(message.slice(0, 120))}`)
     );
 
   // Die Rueckleitung liegt hinter der Middleware-Ausnahme /api/oauth/* und war
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
         })
     );
 
-    const res = NextResponse.redirect(appUrl(req, "/accounts?connected=tiktok"));
+    const res = NextResponse.redirect(appUrl(req, "/verbinden?connected=tiktok"));
     res.cookies.delete("tt_pkce");
     res.cookies.delete("tt_state");
     return res;

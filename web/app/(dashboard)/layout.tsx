@@ -18,6 +18,7 @@ const NAV_ALLTAG = [
 
 const NAV_VERWALTUNG = [
   { href: "/analytics", label: "Zahlen" },
+  { href: "/verbinden", label: "Verbinden" },
   { href: "/accounts", label: "Konten" },
   { href: "/settings", label: "Einstellungen" },
   { href: "/system", label: "System" },
