@@ -1,39 +1,80 @@
 @import "tailwindcss";
 
-/* ── Design-Tokens: helles, typografie-getriebenes Swiss/Editorial-Minimal ──
-   Keine Icons, keine Emojis, keine Component-Library. Farbe nur semantisch. */
-@theme {
-  --color-paper: #fcfcfa;
-  --color-ink: #161615;
-  --color-ink-soft: #5f5e59;
-  /* 4,6:1 auf Papier. Vorher #a3a29b — das waren 2,5:1 und damit unter der
-     Lesbarkeitsnorm, ausgerechnet für Labels, Tabellenköpfe und Platzhalter. */
-  --color-ink-faint: #74736d;
-  --color-hairline: #e4e3dd;
+/* ── Design-Tokens: „Schnittraum" ────────────────────────────────────────────
+   Dunkle Arbeitsfläche wie ein Schneidetisch. Zwei funktionale Gründe, nicht
+   Mode: Clip-Vorschauen und Thumbnails leuchten auf dunklem Grund, statt zu
+   verblassen — und Creator erkennen das Idiom aus jedem Schnittprogramm.
 
-  --color-ok: #15803c;
-  --color-warn: #966608;
-  --color-err: #b3261e;
+   Drei Regeln, die das Ganze zusammenhalten:
+   1. TIEFE ÜBER EBENEN, nicht über Haarlinien. Flächen fangen Licht an ihrer
+      Oberkante (--kante-licht), wie echte Blenden im Rack.
+   2. VIOLETT IST EIN SIGNAL, keine Fläche. Es markiert, was gerade läuft, was
+      den Fokus hat, wohin man klickt — nie als Farbverlauf über den Hintergrund.
+      Die Haupt-Handlung ist bewusst HELL: heller Knopf auf dunklem Grund hat
+      16:1 Kontrast, ein violetter Knopf mit weißer Schrift nur 3,8:1.
+   3. ZEITEN LAUFEN ALS TIMECODE. Uhrzeiten, Zähler, Dauern immer in Mono mit
+      Tabellenziffern — die Sprache einer Timeline, nicht eines Formulars.
+
+   Die Namen „paper" und „ink" sind aus dem hellen Vorgänger übernommen und
+   behalten ihre Bedeutung: paper ist die Fläche, ink das, was darauf steht.
+   Nur die Werte sind gedreht. Dadurch zieht die gesamte Oberfläche mit, ohne
+   dass 16 Seiten angefasst werden mussten. */
+@theme {
+  /* Flächen, von tief nach hoch */
+  --color-paper: #0e0e11;
+  --color-panel: #17171c;
+  --color-raised: #1f1f26;
+  --color-hairline: #2a2a33;
+
+  /* Schrift. Die Kontraste sind gegen --color-paper gerechnet:
+     ink 16:1 · ink-soft 9,3:1 · ink-faint 5,6:1 — alle über der Norm.
+     Der Vorgänger hatte hier schon einmal 2,5:1 stehen; das passiert
+     bei dunklen Oberflächen noch leichter, deshalb nachgerechnet. */
+  --color-ink: #f2f2ef;
+  --color-ink-soft: #b4b4ac;
+  --color-ink-faint: #8a8a82;
+
+  /* Signal */
+  --color-accent: #7c5cff;
+  --color-accent-text: #a992ff; /* 7,6:1 — für Text, wo #7c5cff nur 4,5:1 hat */
+
+  --color-ok: #3dd68c;
+  --color-warn: #ffb020;
+  --color-err: #ff5a52;
 
   /* Zwei benannte Schriftrollen neben Tailwinds Skala: „label" ist die
-     Kapitälchen-Hausschrift, „meta" der Nebentext. Ersetzt die verstreuten
-     text-[10px]/[11px]/[13px]. Tailwinds eigene Größen bleiben unangetastet. */
+     Kapitälchen-Hausschrift, „meta" der Nebentext. */
   --text-label: 0.6875rem;
   --text-meta: 0.8125rem;
 
+  /* Bricolage für Überschriften: variabel, technisch-redaktionell, mit
+     eigenem Charakter. Geist bleibt für Fließtext und Bedienung — und Mono
+     ist die Timecode-Schrift, nicht bloß Dekoration für Code. */
+  --font-display: var(--font-bricolage), var(--font-geist-sans), sans-serif;
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
     sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
 }
 
-/* Abstands-Rhythmus (Konvention, keine Klasse): Seitenabschnitte mb-14,
-   Blöcke innerhalb eines Abschnitts mb-6, Zeilen gap-3. Bitte nicht
-   zwischen mb-10/mb-12/mb-14 mischen. */
+/* Nicht-Farb-Tokens außerhalb von @theme: Tailwind soll daraus keine
+   Utility-Klassen bauen, sie werden nur in CSS verwendet. */
+:root {
+  /* Licht auf der Oberkante — der Unterschied zwischen „Kasten mit Rahmen"
+     und „Blende, die im Raum steht". */
+  --kante-licht: inset 0 1px 0 rgb(255 255 255 / 0.055);
+  --schatten-panel: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.5);
+  --schatten-hoch: 0 2px 4px rgb(0 0 0 / 0.45), 0 16px 40px -16px rgb(0 0 0 / 0.6);
+  --glimmen: 0 0 0 1px rgb(124 92 255 / 0.35), 0 0 24px -6px rgb(124 92 255 / 0.45);
+  --zeit-fast: 120ms;
+  --zeit-normal: 220ms;
+  --kurve: cubic-bezier(0.16, 1, 0.3, 1);
+}
 
 @layer base {
   html {
     background-color: var(--color-paper);
     color: var(--color-ink);
+    color-scheme: dark;
   }
 
   body {
@@ -41,26 +82,138 @@
     font-size: 15px;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+
+  /* Feines Korn über der ganzen Fläche. Ohne das wirkt großflächiges Dunkel
+     digital-flach; mit Korn bekommt es die Textur eines Geräts. Als Daten-URI
+     eingebettet, damit keine zusätzliche Anfrage entsteht. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.028;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.022em;
+    /* Bricolage hat tiefe Unterlängen — das Q in „CreatorHQ" wurde von einer
+       zu engen Zeilenhöhe unten abgeschnitten. 1.12 lässt ihm Platz, ohne die
+       großen Überschriften auseinanderzuziehen. */
+    line-height: 1.12;
   }
 
   ::selection {
-    background-color: var(--color-ink);
-    color: var(--color-paper);
+    background-color: var(--color-accent);
+    color: var(--color-ink);
   }
 
   /* Ein sichtbarer Fokus für die Tastaturbedienung — global, damit keine
-     Komponente ihn vergessen kann. :where() hält die Spezifität bei 0,
-     einzelne Bausteine können ihn also weiterhin überschreiben. */
+     Komponente ihn vergessen kann. :where() hält die Spezifität bei 0.
+     Auf Dunkel muss der Ring leuchten, nicht nur da sein. */
   :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
-    border-radius: 1px;
+    border-radius: 3px;
   }
 }
 
 /* Zahlen in Tabellen/Stats laufen immer in Tabellenziffern. */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Timecode ────────────────────────────────────────────────────────────────
+   Uhrzeiten, Dauern und Zähler. Mono, leicht gesperrt, Tabellenziffern — damit
+   untereinander stehende Zeiten eine Spalte bilden statt zu flimmern. */
+.timecode {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+/* ── Ebenen ──────────────────────────────────────────────────────────────────
+   .flaeche ersetzt den früheren Haarlinien-Rahmen. Der Unterschied zur reinen
+   Hintergrundfarbe ist das Licht auf der Oberkante. */
+.flaeche {
+  background-color: var(--color-panel);
+  box-shadow: var(--kante-licht), var(--schatten-panel);
+  border-radius: 10px;
+}
+
+.flaeche-hoch {
+  background-color: var(--color-raised);
+  box-shadow: var(--kante-licht), var(--schatten-hoch);
+  border-radius: 10px;
+}
+
+/* ── Aufnahmelicht ───────────────────────────────────────────────────────────
+   Der einzige Ort, an dem sich von selbst etwas bewegt: „läuft gerade".
+   Bewegung nur dort, wo sie eine Aussage trägt. */
+.laeuft {
+  position: relative;
+}
+
+.laeuft::before {
+  content: "";
+  position: absolute;
+  left: -0.9rem;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  box-shadow: 0 0 10px 1px rgb(124 92 255 / 0.7);
+  animation: puls 1.8s ease-in-out infinite;
+}
+
+@keyframes puls {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+/* ── Eintritt ────────────────────────────────────────────────────────────────
+   Ein einziger, gestaffelter Aufbau beim Laden statt verstreuter Effekte.
+   Die Verzögerung setzen die Bausteine über --i. */
+@keyframes auf {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.tritt-auf {
+  animation: auf var(--zeit-normal) var(--kurve) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+/* Wer Bewegung reduziert haben will, bekommt sie nicht — inklusive des
+   Aufnahmelichts, das sonst dauerhaft blinkt. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Tabellen als Kartenliste auf dem Handy (opt-in über <Table cards>).

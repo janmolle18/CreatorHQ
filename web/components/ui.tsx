@@ -28,14 +28,16 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <header className="mb-10 flex flex-wrap items-end justify-between gap-6 border-b border-hairline pb-6">
+    <header className="tritt-auf mb-10 flex flex-wrap items-end justify-between gap-6 border-b border-hairline pb-6">
       <div>
         {kicker && (
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-faint">
+          <p className="timecode mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-faint">
             {kicker}
           </p>
         )}
-        <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{title}</h1>
+        {/* Deutlicher Größensprung zum Nebentext — die Hierarchie trägt die
+            Seite, nicht Rahmen und Linien. */}
+        <h1 className="text-[2rem] font-bold md:text-5xl">{title}</h1>
         {description && (
           <p className="mt-3 max-w-xl text-sm text-ink-soft">{description}</p>
         )}
@@ -47,7 +49,10 @@ export function PageHeader({
 
 export function SectionTitle({ children }: { children: ReactNode }) {
   return (
-    <h2 className="mb-4 border-b border-ink pb-2 text-[11px] font-medium uppercase tracking-[0.18em]">
+    // Kurze Akzentmarke links statt einer Linie über die volle Breite: Sie
+    // markiert den Anfang, ohne den Blick quer über die Seite zu ziehen.
+    <h2 className="mb-4 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-soft">
+      <span aria-hidden="true" className="h-3.5 w-[3px] rounded-full bg-accent" />
       {children}
     </h2>
   );
@@ -67,7 +72,7 @@ export function Stat({
       <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-faint">
         {label}
       </p>
-      <p className="tnum mt-2 text-4xl font-semibold tracking-tight">{value}</p>
+      <p className="timecode mt-2 text-4xl font-semibold tracking-tight">{value}</p>
       {hint && <p className="mt-1 text-xs text-ink-soft">{hint}</p>}
     </div>
   );
@@ -91,7 +96,7 @@ export function Table({
     <div className={cards ? "" : "overflow-x-auto"}>
       <table className={`w-full border-collapse text-sm ${cards ? "table-cards" : ""}`}>
         <thead>
-          <tr className="border-b border-ink">
+          <tr className="border-b border-hairline">
             {head.map((label, index) => (
               <th
                 key={label || `spalte-${index}`}
@@ -128,7 +133,7 @@ export function Td({
 
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="border border-dashed border-hairline px-6 py-14 text-center">
+    <div className="flaeche px-6 py-14 text-center">
       <p className="text-sm font-medium">{title}</p>
       {hint && <p className="mt-1 text-sm text-ink-soft">{hint}</p>}
     </div>
@@ -142,17 +147,23 @@ export type ButtonVariant = "primary" | "ghost" | "danger";
  * knopfähnliche Links dieselbe Quelle benutzen. Vorher war sie an drei
  * Stellen nachgebaut — mit auseinanderlaufenden Hover-Tönen.
  *
- * Klare Aktions-Hierarchie: primär = schwarz gefüllt, sekundär = sichtbarer
- * Rahmen mit Hover-Fläche, destruktiv = rot gerahmt.
+ * Klare Aktions-Hierarchie: primär = HELL gefüllt, sekundär = erhöhte Fläche,
+ * destruktiv = rot gerahmt.
+ *
+ * Warum die Haupt-Handlung hell ist und nicht violett: Ein violetter Knopf mit
+ * heller Schrift kommt auf 3,8:1 Kontrast und liegt damit unter der Norm. Hell
+ * auf dunkel erreicht 16:1 — und ist auf dunklem Grund zugleich das Auffälligste,
+ * was es gibt. Das Violett bleibt dem Signal vorbehalten (Fokus, „läuft gerade",
+ * aktiver Menüpunkt) und wird dadurch überhaupt erst lesbar als Signal.
  */
 export function buttonClasses(variant: ButtonVariant = "primary", extra = ""): string {
   const styles =
     variant === "primary"
-      ? "bg-ink text-paper hover:bg-ink/85"
+      ? "bg-ink text-paper hover:bg-white"
       : variant === "danger"
-        ? "border border-err/40 text-err hover:border-err hover:bg-err/[0.06]"
-        : "border border-ink/25 text-ink hover:border-ink hover:bg-ink/[0.04]";
-  return `inline-flex min-h-11 items-center justify-center px-4 text-meta font-medium tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${styles} ${extra}`;
+        ? "border border-err/40 text-err hover:border-err hover:bg-err/[0.08]"
+        : "bg-raised text-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.06)] hover:bg-raised/70";
+  return `inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-meta font-medium tracking-wide transition-[background-color,box-shadow,transform] duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40 ${styles} ${extra}`;
 }
 
 export function Button({
@@ -213,8 +224,10 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
+// Auf dunklem Grund reicht ein Unterstrich nicht: Das Feld braucht eine eigene
+// Fläche, sonst ist nicht erkennbar, wo man hineinschreiben kann.
 const FIELD_BASE =
-  "w-full border-0 border-b border-hairline bg-transparent py-2 text-[15px] placeholder:text-ink-faint focus:border-ink";
+  "w-full rounded-lg border border-hairline bg-panel px-3 py-2.5 text-[15px] text-ink transition-colors placeholder:text-ink-faint hover:border-ink-faint/60 focus:border-accent";
 
 export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`${FIELD_BASE} ${className}`} {...props} />;
@@ -265,12 +278,12 @@ export function Checkbox({
 
 /** Abgesetzte Fläche für gruppierte Inhalte — bewusst flach, nur Haarlinie. */
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`border border-hairline p-5 ${className}`}>{children}</div>;
+  return <div className={`flaeche p-5 ${className}`}>{children}</div>;
 }
 
 export function Badge({ children }: { children: ReactNode }) {
   return (
-    <span className="border border-hairline px-2 py-0.5 text-label uppercase tracking-[0.14em] text-ink-soft">
+    <span className="rounded-md bg-raised px-2 py-0.5 text-label uppercase tracking-[0.14em] text-ink-soft">
       {children}
     </span>
   );

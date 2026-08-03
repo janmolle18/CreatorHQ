@@ -44,7 +44,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           <Link href="/" className="flex items-center gap-3">
             <span
               aria-hidden="true"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-hairline bg-ink text-sm font-semibold text-paper"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-sm font-semibold text-accent-text shadow-[inset_0_1px_0_rgb(255_255_255/0.08)]"
             >
               {initialen(session.tenantName)}
             </span>
