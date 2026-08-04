@@ -12,7 +12,7 @@ if (!arg) {
 }
 
 const queue = new Queue("download", {
-  connection: { url: process.env.REDIS_URL ?? "redis://localhost:6380", maxRetriesPerRequest: null },
+  connection: { url: process.env.REDIS_URL ?? "redis://localhost:6381", maxRetriesPerRequest: null },
 });
 
 const ids = [];

@@ -4,7 +4,7 @@ import "dotenv/config";
 import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 
 const s3 = new S3Client({
-  endpoint: process.env.S3_ENDPOINT ?? "http://localhost:9002",
+  endpoint: process.env.S3_ENDPOINT ?? "http://localhost:9004",
   region: process.env.S3_REGION ?? "us-east-1",
   forcePathStyle: true,
   credentials: {

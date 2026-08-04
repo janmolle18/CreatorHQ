@@ -5,7 +5,7 @@ import "dotenv/config";
 import { Queue } from "bullmq";
 
 const queue = new Queue("briefing", {
-  connection: { url: process.env.REDIS_URL ?? "redis://localhost:6380", maxRetriesPerRequest: null },
+  connection: { url: process.env.REDIS_URL ?? "redis://localhost:6381", maxRetriesPerRequest: null },
 });
 
 await queue.add("daily-briefing", {}, { jobId: `manual-briefing-${Date.now()}` });

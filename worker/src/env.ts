@@ -21,12 +21,12 @@ function optional(name: string, fallback = ""): string {
 
 export const env = {
   databaseUrl: required("DATABASE_URL"),
-  redisUrl: optional("REDIS_URL", "redis://localhost:6380"),
-  appBaseUrl: optional("APP_BASE_URL", "http://localhost:3000"),
+  redisUrl: optional("REDIS_URL", "redis://localhost:6381"),
+  appBaseUrl: optional("APP_BASE_URL", "http://localhost:3001"),
   appEncryptionKey: required("APP_ENCRYPTION_KEY"),
 
   s3: {
-    endpoint: optional("S3_ENDPOINT", "http://localhost:9002"),
+    endpoint: optional("S3_ENDPOINT", "http://localhost:9004"),
     region: optional("S3_REGION", "us-east-1"),
     bucket: optional("S3_BUCKET", "creatorhq"),
     accessKey: optional("S3_ACCESS_KEY", "creatorhq"),

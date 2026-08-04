@@ -14,7 +14,7 @@ let client: S3Client | null = null;
 function s3(): S3Client {
   if (client) return client;
   client = new S3Client({
-    endpoint: process.env.S3_ENDPOINT ?? "http://localhost:9002",
+    endpoint: process.env.S3_ENDPOINT ?? "http://localhost:9004",
     region: process.env.S3_REGION ?? "us-east-1",
     forcePathStyle: (process.env.S3_FORCE_PATH_STYLE ?? "true") === "true",
     credentials: {

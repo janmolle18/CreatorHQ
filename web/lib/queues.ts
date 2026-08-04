@@ -5,7 +5,7 @@ import { Queue } from "bullmq";
 // worker/src/queues.ts passen.
 
 const connection = {
-  url: process.env.REDIS_URL ?? "redis://localhost:6380",
+  url: process.env.REDIS_URL ?? "redis://localhost:6381",
   maxRetriesPerRequest: null,
 } as never;
 

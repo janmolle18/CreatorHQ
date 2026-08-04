@@ -24,8 +24,29 @@ function short(error: unknown): string {
   return message.length > 90 ? `${message.slice(0, 90)}…` : message;
 }
 
+/**
+ * Anzeigename der Datenbank — aus der echten Verbindung, nicht fest verdrahtet.
+ *
+ * Vorher stand hier eine feste Zeichenkette, die nach dem Fork aus DavidHQ auf
+ * dessen Hafen zeigte: Die Systemseite behauptete 5433, verbunden war 5435.
+ * Eine Statusseite, die etwas anderes sagt als die Wirklichkeit, ist schlimmer
+ * als keine.
+ *
+ * Nur Rechnername und Hafen — in der URL steht auch das Passwort.
+ */
+function datenbankAdresse(): string {
+  const roh = process.env.DATABASE_URL;
+  if (!roh) return "postgres · nicht konfiguriert";
+  try {
+    const url = new URL(roh);
+    return `postgres · ${url.hostname}:${url.port || 5432}`;
+  } catch {
+    return "postgres · unlesbare DATABASE_URL";
+  }
+}
+
 async function checkPostgres(): Promise<InfraStatus> {
-  const endpoint = "postgres · localhost:5433";
+  const endpoint = datenbankAdresse();
   const started = Date.now();
   try {
     await db.execute(sql`select 1`);
@@ -42,7 +63,7 @@ async function checkPostgres(): Promise<InfraStatus> {
 }
 
 function checkRedis(): Promise<InfraStatus> {
-  const url = new URL(process.env.REDIS_URL ?? "redis://localhost:6380");
+  const url = new URL(process.env.REDIS_URL ?? "redis://localhost:6381");
   const host = url.hostname;
   const port = Number(url.port || 6379);
   const endpoint = `redis · ${host}:${port}`;
@@ -77,7 +98,7 @@ function checkRedis(): Promise<InfraStatus> {
 }
 
 async function checkMinio(): Promise<InfraStatus> {
-  const base = process.env.S3_ENDPOINT ?? "http://localhost:9002";
+  const base = process.env.S3_ENDPOINT ?? "http://localhost:9004";
   const endpoint = `minio · ${base.replace(/^https?:\/\//, "")}`;
   const started = Date.now();
   try {

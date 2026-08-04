@@ -30,7 +30,7 @@ if (unknown.length > 0) {
   process.exit(1);
 }
 
-const connection = new IORedis(process.env.REDIS_URL ?? "redis://127.0.0.1:6380", {
+const connection = new IORedis(process.env.REDIS_URL ?? "redis://127.0.0.1:6381", {
   maxRetriesPerRequest: null,
 });
 
