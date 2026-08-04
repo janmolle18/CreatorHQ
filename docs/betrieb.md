@@ -123,13 +123,19 @@ docker compose -f docker-compose.prod.yml logs -f web worker
 
 ## Was noch fehlt, bevor du an Fremde verschickst
 
-- [ ] **E-Mail-Bestätigung bei der Registrierung.** Es gibt noch keinen
-      Mailversand. Bis dahin kann sich jemand mit einer fremden Adresse
-      anmelden — ohne Zugriff auf deren Postfach, aber der Platz ist belegt.
-- [ ] **Plattform-Freigaben.** Ohne sie lädt YouTube privat hoch, TikTok legt
-      Entwürfe ab, und nur eingetragene Test-Nutzer können verbinden.
-- [ ] **YouTube-Kontingent erhöhen lassen.** 10.000 Einheiten am Tag geteilt
-      durch 1.600 je Upload = rund **sechs Uploads täglich für alle Kunden
-      zusammen**. Bei zehn Kunden sind das 0,6 pro Kunde und Tag.
+- [x] ~~E-Mail-Bestätigung bei der Registrierung~~ — gebaut. Braucht nur
+      noch die Brevo-Zugangsdaten (siehe unten).
+- [ ] **Plattform-Freigaben** — Unterlagen und Reihenfolge stehen in
+      [`zulassungen.md`](zulassungen.md). Ohne sie lädt YouTube privat hoch,
+      TikTok legt Entwürfe ab, und nur eingetragene Test-Nutzer können
+      verbinden.
+- [ ] **YouTube-Kontingent erhöhen lassen** — ein **getrennter** Antrag neben
+      der Verifizierung. 10.000 Einheiten am Tag ÷ 1.600 je Upload = rund
+      **sechs Uploads täglich für alle Kunden zusammen**.
+- [ ] **Betreiberangaben** (`BETREIBER_*`) ausfüllen, sonst zeigen Impressum
+      und Datenschutz „noch nicht ausgefüllt" — und Google wie Meta prüfen
+      genau diese Seiten.
+- [ ] **Mailversand** (`BREVO_API_KEY`, `MAIL_FROM`) — ohne ihn lehnt die
+      Registrierung in der Produktion ab.
 - [ ] **Abrechnung.** Es gibt noch keine Bezahlschranke — wer sich anmeldet,
       nutzt alles.
