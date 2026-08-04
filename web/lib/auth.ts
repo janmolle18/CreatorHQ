@@ -29,6 +29,8 @@ export interface Session {
   role: MembershipRole;
   /** Jans Blick über alle Mandanten — schaltet die Admin-Zentrale frei. */
   isPlatformAdmin: boolean;
+  /** Adresse bestätigt? Unbestätigte kommen nur auf /bestaetigen. */
+  emailVerified: boolean;
 }
 
 function getSecret(): Uint8Array {
@@ -89,6 +91,7 @@ export async function getSession(): Promise<Session | null> {
   const [zeile] = await db
     .select({
       email: users.email,
+      emailVerifiedAt: users.emailVerifiedAt,
       isPlatformAdmin: users.isPlatformAdmin,
       role: memberships.role,
       tenantName: tenants.name,
@@ -113,13 +116,22 @@ export async function getSession(): Promise<Session | null> {
     tenantStatus: zeile.tenantStatus,
     role: zeile.role,
     isPlatformAdmin: zeile.isPlatformAdmin,
+    emailVerified: zeile.emailVerifiedAt !== null,
   };
 }
 
-/** Guard für Seiten und Server Actions: ohne gültige Sitzung → /login. */
+/**
+ * Guard für Seiten und Server Actions: ohne gültige Sitzung → /login,
+ * ohne bestätigte Adresse → /bestaetigen.
+ *
+ * Die Bestätigung sitzt hier und nicht nur in der Oberfläche: Sonst käme man
+ * mit einer geratenen Adresse zwar nicht ins Dashboard, könnte aber Server
+ * Actions direkt aufrufen — und die sind eine öffentliche Schnittstelle.
+ */
 export async function requireSession(): Promise<Session> {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (!session.emailVerified) redirect("/bestaetigen");
   return session;
 }
 

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Wegwerf-Datenbank für die Mandantentrennungs-Tests.
+# Wegwerf-Datenbank für die Tests, die eine echte Datenbank brauchen:
+# Mandantentrennung (RLS) und die Einmal-Token des Zugangs.
 #
 # Startet einen eigenen Postgres-Container (Port 55999, eigener Name), legt die
 # eingeschränkte Anwendungsrolle an, spielt alle Migrationen ein und säht zwei
@@ -58,7 +59,7 @@ case "${1:-test}" in
   down) runter ;;
   test)
     hoch
-    ( cd "$WURZEL" && TEST_DATABASE_URL="$URL" npx vitest run db/src/tenant.test.ts )
+    ( cd "$WURZEL" && TEST_DATABASE_URL="$URL" npx vitest run db/src/tenant.test.ts web/lib/email-tokens.test.ts )
     ergebnis=$?
     runter
     exit $ergebnis

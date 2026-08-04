@@ -122,6 +122,11 @@ export const membershipRoleEnum = pgEnum("membership_role", [
   "editor", // darf Clips freigeben und posten, aber nichts Vertragliches
 ]);
 
+export const emailTokenPurposeEnum = pgEnum("email_token_purpose", [
+  "verify", // Adresse bestätigen
+  "reset", // Passwort neu setzen
+]);
+
 // ─────────────────── JSONB-Strukturen ───────────────────
 
 export interface BriefingContentIdea {
@@ -196,6 +201,39 @@ export const memberships = pgTable(
     uqMembership: unique("uq_membership_tenant_user").on(t.tenantId, t.userId),
     // „Zu welchen Mandanten gehöre ich?" — läuft bei jeder Anmeldung.
     ixUser: index("ix_membership_user").on(t.userId),
+  })
+);
+
+/**
+ * Einmal-Token für Adressbestätigung und Passwort-Zurücksetzen.
+ *
+ * Gespeichert wird NUR der Hash, nie das Token selbst — genau wie beim
+ * Passwort. Wer die Datenbank liest, kann damit keine fremde Adresse
+ * bestätigen und kein Passwort übernehmen.
+ *
+ * Ohne Mandantenregel: Ein Token wird eingelöst, BEVOR jemand angemeldet ist —
+ * es kann dabei keinen gesetzten Mandanten geben.
+ */
+export const emailTokens = pgTable(
+  "email_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    purpose: emailTokenPurposeEnum("purpose").notNull(),
+    /** SHA-256 des Tokens, hex. */
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** Gesetzt beim Einlösen — ein Token gilt genau einmal. */
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    uqHash: unique("uq_email_token_hash").on(t.tokenHash),
+    // „Alle offenen Token dieses Nutzers" — beim Neuanfordern werden die
+    // alten entwertet, damit nicht mehrere gleichzeitig gültig sind.
+    ixUser: index("ix_email_token_user").on(t.userId, t.purpose),
   })
 );
 
@@ -541,6 +579,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   memberships: many(memberships),
 }));
 
+export const emailTokensRelations = relations(emailTokens, ({ one }) => ({
+  user: one(users, { fields: [emailTokens.userId], references: [users.id] }),
+}));
+
 export const membershipsRelations = relations(memberships, ({ one }) => ({
   tenant: one(tenants, { fields: [memberships.tenantId], references: [tenants.id] }),
   user: one(users, { fields: [memberships.userId], references: [users.id] }),
@@ -612,6 +654,9 @@ export type NewUser = typeof users.$inferInsert;
 export type Membership = typeof memberships.$inferSelect;
 export type NewMembership = typeof memberships.$inferInsert;
 export type MembershipRole = (typeof membershipRoleEnum.enumValues)[number];
+export type EmailToken = typeof emailTokens.$inferSelect;
+export type NewEmailToken = typeof emailTokens.$inferInsert;
+export type EmailTokenPurpose = (typeof emailTokenPurposeEnum.enumValues)[number];
 export type TenantStatus = (typeof tenantStatusEnum.enumValues)[number];
 export type Settings = typeof settings.$inferSelect;
 export type NewSettings = typeof settings.$inferInsert;

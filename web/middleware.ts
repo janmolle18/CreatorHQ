@@ -13,6 +13,10 @@ const PUBLIC_PREFIXES = [
   "/login",
   "/registrieren",
   "/passwort",
+  // Der Bestätigungslink wird oft auf dem Handy geöffnet, während man sich am
+  // Rechner registriert hat — dort gibt es keine Sitzung. Das Token selbst ist
+  // der Nachweis; die Seite entscheidet, was sie zeigt.
+  "/bestaetigen",
   "/api/oauth",
   "/api/public-media",
 ];

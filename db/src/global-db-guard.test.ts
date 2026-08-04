@@ -33,6 +33,14 @@ const ERLAUBT = new Map<string, string>([
   ["web/app/login/actions.ts", "Anmeldung und Registrierung arbeiten auf users/tenants"],
   ["web/lib/slug.ts", "prüft Kurznamen gegen die Mandantentabelle selbst"],
   ["web/lib/infra.ts", "nur `select 1` als Lebenszeichen, liest keine Daten"],
+  [
+    "web/app/bestaetigen/[token]/page.tsx",
+    "löst den Bestätigungslink ein — passiert ohne Anmeldung, also ohne Mandant",
+  ],
+  [
+    "web/lib/email-tokens.ts",
+    "Token werden eingelöst, BEVOR jemand angemeldet ist — dabei kann es keinen gesetzten Mandanten geben",
+  ],
 ]);
 
 /** Erkennt `db` in der Import-Liste von @creatorhq/db — auch mehrzeilig. */

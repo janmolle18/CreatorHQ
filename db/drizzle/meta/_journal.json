@@ -15,6 +15,13 @@
       "when": 1785775572485,
       "tag": "0001_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785865767599,
+      "tag": "0002_round_thing",
+      "breakpoints": true
     }
   ]
 }

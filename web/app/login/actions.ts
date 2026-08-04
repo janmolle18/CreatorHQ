@@ -5,10 +5,18 @@ import { asc, eq, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { createSession, destroySession } from "@/lib/auth";
+import { createSession, destroySession, getSession } from "@/lib/auth";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { freierSlug } from "@/lib/slug";
+import { loeseTokenEin } from "@/lib/email-tokens";
+import {
+  mailKonfiguriert,
+  ohneMailErlaubt,
+  sendeBestaetigung,
+  sendePasswortLink,
+} from "@/lib/zugang-mails";
+import { logger } from "@/lib/logger";
 
 const FENSTER_MS = 15 * 60 * 1000;
 
@@ -117,10 +125,11 @@ const registrierSchema = z.object({
  * EINER Transaktion. Bricht etwas ab, entsteht kein halbes Konto — ein Nutzer
  * ohne Mandant käme sonst nie am Login vorbei.
  *
- * Noch offen: Die E-Mail-Adresse wird nicht bestätigt, weil es im Projekt
- * bislang keinen Mailversand gibt. Bis der steht, kann sich jemand mit einer
- * fremden Adresse anmelden — ohne Zugriff auf deren Postfach, aber der Platz
- * ist belegt. Vor dem ersten öffentlichen Start muss die Bestätigung stehen.
+ * Danach geht eine Bestätigungsmail raus. Ohne eingerichteten Mailversand
+ * bricht die Registrierung in der Produktion ab, statt jeden stillschweigend
+ * als bestätigt durchzuwinken — das wäre genau das Loch, das die Bestätigung
+ * schließen soll. In der Entwicklung gilt das Konto sofort als bestätigt,
+ * sonst käme man lokal nie hinein.
  */
 export async function registerAction(formData: FormData): Promise<void> {
   const key = await absender();
@@ -149,6 +158,16 @@ export async function registerAction(formData: FormData): Promise<void> {
     );
   }
 
+  // Vor dem Anlegen prüfen, nicht danach: Ein Konto, zu dem keine Mail
+  // rausgeht, ist in der Produktion ein Konto, in das niemand hineinkommt.
+  if (!mailKonfiguriert() && !ohneMailErlaubt()) {
+    logger.error("Registrierung abgelehnt: Mailversand ist nicht eingerichtet");
+    redirect(
+      "/registrieren?error=" +
+        encodeURIComponent("Registrierung gerade nicht möglich — bitte später erneut versuchen")
+    );
+  }
+
   const passwordHash = hashPassword(password);
   const slug = await freierSlug(creatorName);
 
@@ -159,7 +178,12 @@ export async function registerAction(formData: FormData): Promise<void> {
       .returning({ id: tenants.id });
     const [nutzer] = await tx
       .insert(users)
-      .values({ email, passwordHash })
+      .values({
+        email,
+        passwordHash,
+        // Ohne Mailversand (nur Entwicklung) sofort bestätigt.
+        emailVerifiedAt: mailKonfiguriert() ? null : new Date(),
+      })
       .returning({ id: users.id });
     await tx
       .insert(memberships)
@@ -175,8 +199,112 @@ export async function registerAction(formData: FormData): Promise<void> {
     return { userId: nutzer!.id, tenantId: tenant!.id };
   });
 
+  if (mailKonfiguriert()) {
+    try {
+      await sendeBestaetigung(userId, email);
+    } catch (error) {
+      // Das Konto steht bereits. Die Mail lässt sich auf /bestaetigen erneut
+      // anfordern — deshalb hier nur laut protokollieren statt abbrechen.
+      logger.error({ err: String(error) }, "Bestätigungsmail konnte nicht gesendet werden");
+    }
+  }
+
   await createSession(userId, tenantId);
-  redirect("/verbinden?willkommen=1");
+  redirect(mailKonfiguriert() ? "/bestaetigen" : "/verbinden?willkommen=1");
+}
+
+// ── Adresse bestätigen ─────────────────────────────────────────────────────
+
+/** Fordert eine neue Bestätigungsmail an (Knopf auf /bestaetigen). */
+export async function sendeBestaetigungErneutAction(): Promise<void> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.emailVerified) redirect("/");
+
+  // Gleiche Bremse wie beim Login: Sonst ließe sich über den Knopf ein
+  // fremdes Postfach zumüllen.
+  if (!limiter.check(await absender())) redirect("/bestaetigen?error=rate");
+
+  try {
+    await sendeBestaetigung(session.userId, session.email);
+  } catch (error) {
+    logger.error({ err: String(error) }, "Bestätigungsmail (erneut) fehlgeschlagen");
+    redirect("/bestaetigen?error=versand");
+  }
+  redirect("/bestaetigen?gesendet=1");
+}
+
+// ── Passwort zurücksetzen ──────────────────────────────────────────────────
+
+/**
+ * Fordert einen Link zum Zurücksetzen an.
+ *
+ * Antwortet IMMER gleich, egal ob die Adresse existiert. Andernfalls wäre das
+ * Formular eine Auskunftsstelle darüber, wer hier Kunde ist.
+ */
+export async function requestPasswortResetAction(formData: FormData): Promise<void> {
+  const key = await absender();
+  if (!limiter.check(key)) redirect("/passwort?error=rate");
+
+  const eingabe = z.string().trim().toLowerCase().email().max(320)
+    .safeParse(formData.get("email") ?? "");
+
+  if (eingabe.success) {
+    const [nutzer] = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.email, eingabe.data))
+      .limit(1);
+    if (nutzer && mailKonfiguriert()) {
+      try {
+        await sendePasswortLink(nutzer.id, nutzer.email);
+      } catch (error) {
+        logger.error({ err: String(error) }, "Passwort-Mail fehlgeschlagen");
+      }
+    }
+  }
+
+  redirect("/passwort?gesendet=1");
+}
+
+const neuesPasswortSchema = z.object({
+  token: z.string().min(1).max(200),
+  password: z
+    .string()
+    .min(12, "Mindestens 12 Zeichen — kurze Passwörter sind das häufigste Einfallstor")
+    .max(400),
+});
+
+/** Setzt das Passwort mit einem gültigen Token neu. */
+export async function setzePasswortAction(formData: FormData): Promise<void> {
+  const eingabe = neuesPasswortSchema.safeParse({
+    token: formData.get("token") ?? "",
+    password: formData.get("password") ?? "",
+  });
+  if (!eingabe.success) {
+    const meldung = eingabe.error.issues[0]?.message ?? "Eingabe unvollständig";
+    redirect(
+      `/passwort/neu/${String(formData.get("token") ?? "")}?error=${encodeURIComponent(meldung)}`
+    );
+  }
+
+  const { token, password } = eingabe.data!;
+  const eingeloest = await loeseTokenEin(token, "reset");
+  if (!eingeloest) redirect("/passwort?error=abgelaufen");
+
+  await db
+    .update(users)
+    .set({
+      passwordHash: hashPassword(password),
+      // Wer den Link im Postfach öffnen konnte, hat die Adresse damit belegt.
+      emailVerifiedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, eingeloest.userId));
+
+  // Alle offenen Sitzungen dieses Nutzers laufen weiter — bewusst: Ein
+  // vergessenes Passwort ist kein Einbruch. Wer ausloggen will, tut es selbst.
+  redirect("/login?passwort=neu");
 }
 
 export async function logoutAction(): Promise<void> {
