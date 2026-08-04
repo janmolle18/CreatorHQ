@@ -4,6 +4,8 @@ import { requireSession } from "@/lib/auth";
 import { NavLink } from "@/components/nav-link";
 import { RechtsFussleiste } from "@/components/rechts-fussleiste";
 import { logoutAction } from "@/app/login/actions";
+import { verlasseKanalAction } from "@/app/(dashboard)/zentrale/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 // Alltag zuerst, Verwaltung abgesetzt darunter. Die Reihenfolge folgt dem
 // Tagesablauf eines Creators: Was ist zu tun → posten → entscheiden → nachsehen.
@@ -35,10 +37,38 @@ function initialen(name: string): string {
     .join("");
 }
 
+/**
+ * Warnband, solange ein Betreiber im Kanal eines Kunden arbeitet.
+ *
+ * Bewusst laut und ganz oben, über allem: Der gefährliche Fehler ist nicht,
+ * hineinzukommen — sondern zu vergessen, dass man drin ist, und im Namen
+ * eines Kunden zu veröffentlichen.
+ */
+function FremderKanalBand({ kanal }: { kanal: string }) {
+  return (
+    <div className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 bg-warn px-6 py-2.5 text-paper">
+      <p className="text-meta font-semibold">
+        Du arbeitest im Kanal <span className="underline underline-offset-4">{kanal}</span> — alles,
+        was du hier tust, geschieht in dessen Namen.
+      </p>
+      <form action={verlasseKanalAction}>
+        <SubmitButton variant="ghost" pendingLabel="…" className="!min-h-9 !bg-paper/15 !text-paper">
+          Verlassen
+        </SubmitButton>
+      </form>
+    </div>
+  );
+}
+
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
+  const navVerwaltung = session.isPlatformAdmin
+    ? [{ href: "/zentrale", label: "Zentrale" }, ...NAV_VERWALTUNG]
+    : NAV_VERWALTUNG;
 
   return (
+    <>
+      {session.alsAdminImFremdenKanal && <FremderKanalBand kanal={session.tenantName} />}
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col md:grid md:grid-cols-[230px_1fr]">
       <aside className="flex flex-col border-b border-hairline px-6 py-6 md:sticky md:top-0 md:h-screen md:justify-between md:border-b-0 md:border-r md:py-10">
         <div>
@@ -64,7 +94,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               <NavLink key={item.href} {...item} orientation="vertical" />
             ))}
             <span className="my-3 border-t border-hairline" aria-hidden="true" />
-            {NAV_VERWALTUNG.map((item) => (
+            {navVerwaltung.map((item) => (
               <NavLink key={item.href} {...item} orientation="vertical" />
             ))}
           </nav>
@@ -78,7 +108,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               ))}
             </div>
             <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 border-t border-hairline pt-2">
-              {NAV_VERWALTUNG.map((item) => (
+              {navVerwaltung.map((item) => (
                 <NavLink key={item.href} {...item} orientation="horizontal" />
               ))}
             </div>
@@ -101,5 +131,6 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
       <main className="px-6 py-10 md:px-12 md:py-12">{children}</main>
     </div>
+    </>
   );
 }

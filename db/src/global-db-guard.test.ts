@@ -38,6 +38,14 @@ const ERLAUBT = new Map<string, string>([
     "löst den Bestätigungslink ein — passiert ohne Anmeldung, also ohne Mandant",
   ],
   [
+    "web/app/(dashboard)/zentrale/page.tsx",
+    "Betreiber-Zentrale liest tenants/users/memberships — die stehen über der Mandantengrenze",
+  ],
+  [
+    "web/app/(dashboard)/zentrale/actions.ts",
+    "setzt Kanal-Zustände und wechselt Kanäle — arbeitet auf tenants/memberships",
+  ],
+  [
     "web/lib/email-tokens.ts",
     "Token werden eingelöst, BEVOR jemand angemeldet ist — dabei kann es keinen gesetzten Mandanten geben",
   ],

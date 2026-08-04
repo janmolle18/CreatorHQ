@@ -31,6 +31,14 @@ export interface Session {
   isPlatformAdmin: boolean;
   /** Adresse bestätigt? Unbestätigte kommen nur auf /bestaetigen. */
   emailVerified: boolean;
+  /**
+   * Wahr, wenn hier ein Betreiber in einem fremden Kanal arbeitet — also ohne
+   * Mitgliedschaft, allein kraft Admin-Recht.
+   *
+   * Die Oberfläche MUSS das sichtbar machen. Ein Betreiber, der vergisst, in
+   * wessen Kanal er gerade ist, veröffentlicht im Namen eines Kunden.
+   */
+  alsAdminImFremdenKanal: boolean;
 }
 
 function getSecret(): Uint8Array {
@@ -88,6 +96,10 @@ export async function getSession(): Promise<Session | null> {
     return null;
   }
 
+  // Ausgangspunkt ist der NUTZER, nicht die Mitgliedschaft: Ein Betreiber
+  // darf einen fremden Kanal betreten, um zu helfen — dort hat er per
+  // Definition keine Mitgliedschaft. Beide Verknüpfungen sind deshalb links,
+  // und was fehlen darf, wird unten einzeln entschieden.
   const [zeile] = await db
     .select({
       email: users.email,
@@ -97,16 +109,29 @@ export async function getSession(): Promise<Session | null> {
       tenantName: tenants.name,
       tenantStatus: tenants.status,
     })
-    .from(memberships)
-    .innerJoin(users, eq(users.id, memberships.userId))
-    .innerJoin(tenants, eq(tenants.id, memberships.tenantId))
-    .where(and(eq(memberships.userId, userId), eq(memberships.tenantId, tenantId)))
+    .from(users)
+    .leftJoin(
+      memberships,
+      and(eq(memberships.userId, users.id), eq(memberships.tenantId, tenantId))
+    )
+    .leftJoin(tenants, eq(tenants.id, tenantId))
+    .where(eq(users.id, userId))
     .limit(1);
 
-  if (!zeile) return null;
+  // Nutzer gelöscht, oder der Kanal im Keks existiert nicht mehr.
+  if (!zeile || zeile.tenantName === null || zeile.tenantStatus === null) return null;
+
+  const alsAdminImFremdenKanal = zeile.role === null;
+
+  // DAS ist die Tür. Ohne Mitgliedschaft kommt nur herein, wer Betreiber ist —
+  // und dieses Kennzeichen kommt aus der Datenbank, nicht aus dem Keks.
+  if (alsAdminImFremdenKanal && !zeile.isPlatformAdmin) return null;
+
   // Gekündigt heißt: kein Zugang mehr. "suspended" bleibt bewusst offen —
   // wer eine Rechnung übersieht, soll seine Daten noch sehen können.
-  if (zeile.tenantStatus === "cancelled") return null;
+  // Für den Betreiber bleibt auch ein gekündigter Kanal einsehbar: Genau dann
+  // kommen die Rückfragen ("wo sind meine Daten?").
+  if (zeile.tenantStatus === "cancelled" && !zeile.isPlatformAdmin) return null;
 
   return {
     userId,
@@ -114,10 +139,20 @@ export async function getSession(): Promise<Session | null> {
     tenantId,
     tenantName: zeile.tenantName,
     tenantStatus: zeile.tenantStatus,
-    role: zeile.role,
+    // Im fremden Kanal arbeitet der Betreiber mit vollen Rechten — er ist da,
+    // um etwas in Ordnung zu bringen, nicht um zuzusehen.
+    role: zeile.role ?? "owner",
     isPlatformAdmin: zeile.isPlatformAdmin,
     emailVerified: zeile.emailVerifiedAt !== null,
+    alsAdminImFremdenKanal,
   };
+}
+
+/** Guard für die Betreiber-Zentrale. */
+export async function requirePlatformAdmin(): Promise<Session> {
+  const session = await requireSession();
+  if (!session.isPlatformAdmin) redirect("/");
+  return session;
 }
 
 /**

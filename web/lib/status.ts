@@ -66,6 +66,22 @@ export const SOURCE_STATUS: Record<SourceVideo["status"], StatusMeta> = {
   reference: { label: "Referenz", tone: "muted", hint: "wird nur gemessen" },
 };
 
+/**
+ * Zustand eines Kanals (Mandanten) — nur in der Betreiber-Zentrale sichtbar.
+ *
+ * Die Farbregel gilt hier aus BETREIBER-Sicht: „gelb" heißt, dass Jan dran ist.
+ */
+export const TENANT_STATUS: Record<"trial" | "active" | "suspended" | "cancelled", StatusMeta> = {
+  trial: { label: "Testphase", tone: "muted" },
+  active: { label: "Zahlt", tone: "ok" },
+  suspended: {
+    label: "Gesperrt",
+    tone: "warn",
+    hint: "sieht seine Daten, kann aber nicht posten",
+  },
+  cancelled: { label: "Gekündigt", tone: "err", hint: "kommt nicht mehr hinein" },
+};
+
 export const ACCOUNT_STATUS: Record<SocialAccount["status"], StatusMeta> = {
   disconnected: { label: "Nicht verbunden", tone: "muted" },
   connected: { label: "Verbunden", tone: "ok" },
