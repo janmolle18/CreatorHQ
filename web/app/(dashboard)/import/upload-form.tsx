@@ -55,7 +55,7 @@ export function UploadForm() {
 
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <label className="cursor-pointer border border-hairline px-4 py-2 text-[13px] font-medium tracking-wide transition-colors hover:border-ink">
+      <label className="cursor-pointer border border-hairline px-4 py-2 text-[13px] font-medium tracking-wide transition-colors hover:border-ink-faint">
         Dateien auswählen
         <input
           ref={inputRef}

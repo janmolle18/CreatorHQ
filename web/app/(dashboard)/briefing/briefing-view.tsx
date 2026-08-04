@@ -84,7 +84,7 @@ export async function BriefingView({ briefing }: { briefing: Briefing }) {
               return (
                 <article key={index} className="grid gap-4 py-6 md:grid-cols-[1fr_200px]">
                   <div className="max-w-xl">
-                    <blockquote className="border-l-2 border-ink pl-4 text-sm">
+                    <blockquote className="border-l-2 border-accent/60 pl-4 text-sm">
                       „{comment?.text ?? candidate.commentId}“
                       <footer className="mt-1 text-xs text-ink-soft">
                         {comment?.author ?? "Unbekannt"}

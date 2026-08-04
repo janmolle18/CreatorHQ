@@ -175,7 +175,7 @@ async function CalendarPageInhalt({
 
       <div className="overflow-x-auto">
         <div className="min-w-[640px]">
-          <div className="grid grid-cols-7 border-b border-ink">
+          <div className="grid grid-cols-7 border-b border-hairline">
             {WEEKDAYS.map((weekday) => (
               <p
                 key={weekday}
@@ -198,7 +198,7 @@ async function CalendarPageInhalt({
                     <p
                       className={`tnum text-right text-xs ${
                         day === today
-                          ? "-m-1 mb-1 border border-ink p-1 font-semibold"
+                          ? "-m-1 mb-1 border border-accent p-1 font-semibold"
                           : "text-ink-faint"
                       }`}
                     >

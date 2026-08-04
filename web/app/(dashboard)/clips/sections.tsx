@@ -86,7 +86,7 @@ function SubtitleEditor({ clip }: { clip: Clip }) {
           defaultValue={clip.subtitles ?? ""}
           rows={8}
           spellCheck={false}
-          className="tnum w-full border border-hairline bg-transparent p-3 font-mono text-xs leading-relaxed focus:border-ink focus:outline-none"
+          className="tnum w-full border border-hairline bg-transparent p-3 font-mono text-xs leading-relaxed focus:border-accent focus:shadow-[0_0_0_3px_rgb(124_92_255/0.18)] focus:outline-none"
           placeholder={"1\n00:00:00,000 --> 00:00:02,000\nText …"}
         />
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -326,7 +326,7 @@ export function ProductionSection({
                   name="caption"
                   defaultValue={clip.caption ?? ""}
                   rows={3}
-                  className="w-full border-0 border-b border-hairline bg-transparent py-2 text-[15px] placeholder:text-ink-faint focus:border-ink focus:outline-none"
+                  className="w-full border-0 border-b border-hairline bg-transparent py-2 text-[15px] placeholder:text-ink-faint focus:border-accent focus:shadow-[0_0_0_3px_rgb(124_92_255/0.18)] focus:outline-none"
                   placeholder="Caption für TikTok/Reels/Shorts"
                 />
               </Field>

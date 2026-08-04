@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db, users } from "@creatorhq/db";
 import { eq } from "drizzle-orm";
 import { loeseTokenEin } from "@/lib/email-tokens";
-import { StatusText } from "@/components/ui";
+import { StatusText, buttonClasses } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +44,7 @@ export default async function BestaetigenTokenPage({
             </p>
             <Link
               href="/verbinden"
-              className="mt-8 inline-block rounded-lg bg-ink px-5 py-2.5 text-[13px] font-medium tracking-wide text-paper transition-colors hover:bg-white"
+              className={buttonClasses("primary", "mt-8")}
             >
               Weiter zum Verbinden
             </Link>
@@ -66,7 +66,7 @@ export default async function BestaetigenTokenPage({
             </p>
             <Link
               href="/login"
-              className="mt-8 inline-block rounded-lg bg-ink px-5 py-2.5 text-[13px] font-medium tracking-wide text-paper transition-colors hover:bg-white"
+              className={buttonClasses("primary", "mt-8")}
             >
               Zur Anmeldung
             </Link>

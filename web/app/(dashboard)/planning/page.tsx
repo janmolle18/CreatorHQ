@@ -132,7 +132,7 @@ async function PlanningPageInhalt({
           const columnIdeas = rows.filter((idea) => idea.status === column.status);
           return (
             <section key={column.status} aria-label={column.title}>
-              <h2 className="mb-4 flex items-baseline justify-between border-b border-ink pb-2">
+              <h2 className="mb-4 flex items-baseline justify-between border-b border-hairline pb-2">
                 <span className="text-[11px] font-medium uppercase tracking-[0.18em]">
                   {column.title}
                 </span>
@@ -181,13 +181,13 @@ async function PlanningPageInhalt({
                             type="date"
                             name="date"
                             required
-                            className="border-0 border-b border-hairline bg-transparent py-1 text-xs focus:border-ink focus:outline-none"
+                            className="border-0 border-b border-hairline bg-transparent py-1 text-xs focus:border-accent focus:shadow-[0_0_0_3px_rgb(124_92_255/0.18)] focus:outline-none"
                           />
                           <input
                             type="time"
                             name="time"
                             defaultValue="10:00"
-                            className="tnum border-0 border-b border-hairline bg-transparent py-1 text-xs focus:border-ink focus:outline-none"
+                            className="tnum border-0 border-b border-hairline bg-transparent py-1 text-xs focus:border-accent focus:shadow-[0_0_0_3px_rgb(124_92_255/0.18)] focus:outline-none"
                           />
                           <button
                             type="submit"

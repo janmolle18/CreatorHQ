@@ -2,7 +2,7 @@ import { socialAccounts, type SocialAccount } from "@creatorhq/db";
 import { PLATFORM_LABELS, PUBLISH_PLATFORMS, type PublishPlatform } from "@creatorhq/shared";
 import { mitMandant } from "@/lib/auth";
 import { plattformBereitschaft } from "@/lib/platform-status";
-import { Card, PageHeader, StatusText } from "@/components/ui";
+import { Card, PageHeader, StatusText, buttonClasses } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +102,7 @@ export default async function VerbindenPage({
                 <div className="mt-5">
                   <a
                     href={bereitschaft.href}
-                    className="inline-block bg-ink px-5 py-2.5 text-[13px] font-medium tracking-wide text-paper transition-colors hover:bg-ink/80"
+                    className={buttonClasses("primary")}
                   >
                     {lage === "verbunden"
                       ? "Neu verbinden"
