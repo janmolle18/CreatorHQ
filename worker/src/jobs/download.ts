@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { env } from "../env.ts";
 import { logger } from "../logger.ts";
-import { queues, type SourceVideoJob } from "../queues.ts";
+import { queues, reiheEinmalEin, type SourceVideoJob } from "../queues.ts";
 import { uploadFile, TMP_DIR } from "../integrations/storage.ts";
 import { markSourceAsReference } from "./reference.ts";
 import { imAuftragsMandanten } from "../tenant.ts";
@@ -116,10 +116,15 @@ export async function processDownload(job: Job<SourceVideoJob>): Promise<void> {
         })
         .where(eq(sourceVideos.id, sourceVideoId));
 
-      await queues.clip.add(
+      // reiheEinmalEin statt add: BullMQ verwirft ein `add` mit BEKANNTER
+      // Kennung stillschweigend — auch wenn der alte Auftrag längst fertig
+      // oder gescheitert ist. Bei einem zweiten Anlauf derselben Quelle ginge
+      // der Schnitt so verloren, und die Quelle bliebe auf `downloaded` stehen.
+      await reiheEinmalEin(
+        queues.clip,
         "clip",
         { tenantId, sourceVideoId },
-        { jobId: `clip-${sourceVideoId}` },
+        `clip-${sourceVideoId}`,
       );
       logger.info(
         { sourceVideoId, duration },

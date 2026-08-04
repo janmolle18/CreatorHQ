@@ -448,6 +448,29 @@ const maintenanceWorker = new Worker(
             );
           }
 
+          // Geladene Quellen, die nie geschnitten wurden.
+          //
+          // `downloaded` ist ein Durchgangszustand: Der Download-Auftrag reiht
+          // den Schnitt direkt hinterher. Reisst diese eine Verbindung, blieb
+          // die Quelle ohne diesen Sweep für immer liegen — in DavidHQ lagen
+          // genau so zwei Videos fünf Tage da, ohne Fehlermeldung.
+          //
+          // Keine Endlosschleife: Scheitert der Schnitt, setzt clip.ts die
+          // Quelle auf `failed`, und sie fällt hier heraus.
+          const ungeschnitten = await db
+            .select({ id: sourceVideos.id })
+            .from(sourceVideos)
+            .where(eq(sourceVideos.status, "downloaded"))
+            .limit(MAX_JE_MANDANT_PRO_DURCHGANG);
+          for (const source of ungeschnitten) {
+            await reiheEinmalEin(
+              queues.clip,
+              "clip",
+              { tenantId, sourceVideoId: source.id },
+              `clip-${source.id}`
+            );
+          }
+
           // Importierte Clips ohne ffprobe-Daten validieren.
           const unvalidated = await db
             .select({ id: clips.id })
@@ -463,9 +486,14 @@ const maintenanceWorker = new Worker(
             );
           }
 
-          if (discovered.length + unvalidated.length > 0) {
+          if (discovered.length + ungeschnitten.length + unvalidated.length > 0) {
             logger.info(
-              { tenantId, downloads: discovered.length, validations: unvalidated.length },
+              {
+                tenantId,
+                downloads: discovered.length,
+                schnitte: ungeschnitten.length,
+                validations: unvalidated.length,
+              },
               "ingest-tick: eingereiht"
             );
           }

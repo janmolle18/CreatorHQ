@@ -5,7 +5,7 @@ import { execa } from "execa";
 import { writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { logger } from "../logger.ts";
-import { queues } from "../queues.ts";
+import { queues, reiheEinmalEin } from "../queues.ts";
 import {
   downloadKeyToTmp,
   uploadFile,
@@ -214,10 +214,14 @@ export async function processRender(job: Job<RenderJob>): Promise<void> {
         );
         return;
       }
-      await queues.maintenance.add(
+      // reiheEinmalEin statt add — siehe download.ts: Ein zweiter Render
+      // desselben Clips (etwa nach „Neu rendern") würde sonst still nicht
+      // eingeplant, weil die Kennung schon einmal vergeben war.
+      await reiheEinmalEin(
+        queues.maintenance,
         "schedule",
         { tenantId, clipId },
-        { jobId: `schedule-${clipId}` },
+        `schedule-${clipId}`,
       );
       logger.info(
         { clipId, key },
