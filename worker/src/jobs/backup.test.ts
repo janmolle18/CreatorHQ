@@ -1,5 +1,27 @@
 import { describe, expect, test } from "vitest";
-import { backupsToPrune } from "./backup.ts";
+import { backupsToPrune, sicherungsVerbindung } from "./backup.ts";
+
+describe("sicherungsVerbindung", () => {
+  test("nimmt BACKUP_DATABASE_URL", () => {
+    expect(sicherungsVerbindung({ BACKUP_DATABASE_URL: "postgres://sicher@db/x" })).toBe(
+      "postgres://sicher@db/x"
+    );
+  });
+
+  test("faellt NICHT auf DATABASE_URL zurueck", () => {
+    // Der Rückfall wäre schlimmer als der Abbruch: pg_dump schaltet
+    // row_security ab und scheitert dann für die Anwendungsrolle an der
+    // Mandantenregel — jede Nacht, mit einer Meldung, die nach einem
+    // Datenbankproblem aussieht statt nach einer fehlenden Einstellung.
+    expect(() => sicherungsVerbindung({ DATABASE_URL: "postgres://app@db/x" })).toThrow(
+      /BACKUP_DATABASE_URL/
+    );
+  });
+
+  test("leer zaehlt wie nicht gesetzt", () => {
+    expect(() => sicherungsVerbindung({ BACKUP_DATABASE_URL: "   " })).toThrow();
+  });
+});
 
 describe("backupsToPrune", () => {
   test("löscht die ältesten über der Retention", () => {

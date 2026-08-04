@@ -110,6 +110,10 @@ services:
       # Lang laufende Aufträge belegen je eine Verbindung; der Takt braucht
       # daneben eine freie.
       DB_POOL_MAX: 20
+      # Eigene Rolle fuer pg_dump: BYPASSRLS (sonst bricht der Dump an der
+      # Mandantenregel ab), aber nur lesend. Ohne diesen Wert laeuft KEINE
+      # Sicherung — der Auftrag sagt das dann deutlich.
+      BACKUP_DATABASE_URL: postgres://${BACKUP_DB_USER}:${BACKUP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
       TMP_DIR: /app/tmp
     volumes:
       - worker_tmp:/app/tmp

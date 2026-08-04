@@ -75,6 +75,7 @@ services:
     environment:
       # Im Container gelten die Service-Namen statt der Host-Ports.
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      BACKUP_DATABASE_URL: postgres://${BACKUP_DB_USER}:${BACKUP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
       S3_ENDPOINT: http://minio:9000
       DB_POOL_MAX: 20

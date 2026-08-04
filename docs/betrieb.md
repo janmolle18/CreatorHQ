@@ -109,6 +109,35 @@ woanders hin, sonst ist er beim Serverausfall mit weg:
 rsync -az server:creatorhq/backups/ ~/creatorhq-sicherungen/
 ```
 
+> ⚠️ **Die Sicherung braucht eine eigene Datenbankrolle.** `pg_dump` schaltet
+> `row_security = off` und liest dann jede Tabelle; für eine Rolle ohne
+> `BYPASSRLS` bricht Postgres das ab. Mit der Anwendungsrolle scheitert die
+> Sicherung deshalb **jede Nacht** — sichtbar nur als eine Zeile im Protokoll.
+> Ein Server ohne Sicherungen, der aussieht wie einer mit.
+>
+> Bei einer **neu aufgesetzten** Datenbank legt `db/init/01-app-role.sh` die
+> Rolle `creatorhq_backup` mit an. Eine **bestehende** Datenbank kennt sie
+> nicht — dort einmal:
+>
+> ```bash
+> ./scripts/sicherungs-rolle.sh
+> ```
+>
+> Danach `BACKUP_DATABASE_URL` eintragen (siehe `.env.example`). Ohne diesen
+> Wert bricht der Auftrag mit einer klaren Meldung ab, statt es mit einer
+> Rolle zu versuchen, die es nicht darf.
+
+**Prüfen, ob die Sicherung wirklich läuft** — nicht erst, wenn du sie
+brauchst. Ein leerer oder nur schemaweiter Abzug sieht auf der Dateiliste
+genauso aus wie ein guter:
+
+```bash
+gunzip -c backups/creatorhq-$(date +%F).sql.gz | grep -c '^COPY '
+```
+
+Erwartet werden **15** Blöcke. Kommt 0 oder 1 zurück, enthält der Abzug keine
+Daten — dann stimmt etwas mit der Sicherungsrolle nicht.
+
 Was der Abzug **nicht** enthält: die Videodateien in MinIO. Quellvideos und
 gerenderte Clips lassen sich neu erzeugen — hochgeladene Instagram-Importe
 nicht. Für die brauchst du eine eigene Sicherung, sobald Kunden sie nutzen.
