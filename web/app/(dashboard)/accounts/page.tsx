@@ -3,19 +3,13 @@ import { socialAccounts, type SocialAccount } from "@creatorhq/db";
 import { PLATFORM_LABELS, PUBLISH_PLATFORMS, type PublishPlatform } from "@creatorhq/shared";
 import { mitMandant } from "@/lib/auth";
 import { Button, Field, Input, PageHeader, StatusText } from "@/components/ui";
+import { ACCOUNT_STATUS } from "@/lib/status";
 import { savePostingPlanAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_LABEL: Record<
-  SocialAccount["status"],
-  { label: string; tone: "ok" | "warn" | "err" | "muted" }
-> = {
-  connected: { label: "Verbunden", tone: "ok" },
-  disconnected: { label: "Nicht verbunden", tone: "muted" },
-  expired: { label: "Abgelaufen — neu verbinden", tone: "err" },
-  disabled: { label: "Pausiert", tone: "warn" },
-};
+// Statustexte aus der Registry (web/lib/status.ts). Hier stand „Pausiert“
+// auf gelb — gelb heißt aber „du bist dran“, und pausiert ist niemand dran.
 
 export default async function AccountsPage({
   searchParams,
@@ -43,7 +37,7 @@ export default async function AccountsPage({
       <div className="divide-y divide-hairline">
         {PUBLISH_PLATFORMS.map((platform) => {
           const account = byPlatform.get(platform);
-          const status = STATUS_LABEL[account?.status ?? "disconnected"];
+          const status = ACCOUNT_STATUS[account?.status ?? "disconnected"];
           return (
             <section key={platform} className="grid gap-8 py-10 md:grid-cols-[220px_1fr]">
               <div>

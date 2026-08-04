@@ -7,15 +7,15 @@ import type { Briefing, Clip, Idea, Post, SocialAccount, SourceVideo } from "@cr
 // mal „Live", `failed` mal „Fehler" und mal „Fehlgeschlagen".
 //
 // Die Farbregel, die alles entscheidet:
-//   ok    (grün) = erledigt, David muss nichts tun
-//   warn  (gelb) = David ist dran
-//   err   (rot)  = kaputt, Jan muss ran
+//   ok    (grün) = erledigt, der Creator muss nichts tun
+//   warn  (gelb) = der Creator ist dran
+//   err   (rot)  = kaputt, wir müssen ran
 //   muted (grau) = läuft von allein
 //
 // Bewusst hier und nicht in shared/: shared/ ist der Vertrag zwischen Worker
 // und Web — jede Wortänderung würde sonst einen Docker-Neubau erzwingen.
 //
-// Sprachregel für die ganze Oberfläche (Davids Wörter, nicht unsere):
+// Sprachregel für die ganze Oberfläche (die Wörter des Creators, nicht unsere):
 //   Push → „hochladen" · Slot → „Zeit" · Backlog → „Ideen" · Ingest → „Quellen"
 //   Publish-fertig → „Fertig zum Posten" · Snapshot → „Messung"
 //   Queue/Worker/Render/Container gehören ausschließlich auf die System-Seite.
@@ -23,7 +23,7 @@ import type { Briefing, Clip, Idea, Post, SocialAccount, SourceVideo } from "@cr
 export type Tone = "ok" | "warn" | "err" | "muted";
 
 export interface StatusMeta {
-  /** Davids Wort — überall identisch. */
+  /** Das Wort des Creators — überall identisch. */
   label: string;
   tone: Tone;
   /** Ein Satz Klartext, wo das Label allein nicht reicht. */
@@ -38,8 +38,8 @@ export const POST_STATUS: Record<Post["status"], StatusMeta> = {
   draft: { label: "Entwurf", tone: "muted" },
   scheduled: { label: "Geplant", tone: "muted" },
   uploading: { label: "Wird hochgeladen", tone: "muted" },
-  // Übergeben heißt NICHT veröffentlicht: bei TikTok liegt das Video in
-  // Davids Inbox, bei YouTube steht es auf privat. Er muss noch tippen.
+  // Übergeben heißt NICHT veröffentlicht: Bei TikTok liegt das Video im
+  // Posteingang, bei YouTube auf privat. Es fehlt noch ein Handgriff.
   posted: { label: "Übergeben — du bist dran", tone: "warn" },
   published: { label: "Veröffentlicht", tone: "ok" },
   awaiting_manual: { label: "Du bist dran", tone: "warn" },
@@ -115,7 +115,7 @@ export type PostUrgency = "overdue" | "today" | "later" | "done";
 
 /**
  * Wie dringend ist ein Post? `todayEnd` ist das Ende des laufenden Tages in
- * Davids Zeitzone — bewusst als Parameter, damit die Zeitzonen-Rechnung
+ * Zeitzone des Creators — bewusst als Parameter, damit die Zeitzonen-Rechnung
  * einmal an der Seite passiert und nicht in jeder Zeile neu.
  */
 export function postUrgency(

@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
  *
  * Warum nicht einfach `new URL(pfad, req.url)`: `next start` ersetzt den Host
  * in `req.url` stur durch die Bind-Adresse ("localhost:3000"). Hinter dem
- * Tunnel landet David damit nach erfolgreicher Zustimmung auf einer toten
+ * Proxy landet der Creator damit nach erfolgreicher Zustimmung auf einer toten
  * Seite auf seinem eigenen Gerät. Die Middleware baut ihre Weiterleitung
  * deshalb schon lange aus den Headern (`web/middleware.ts`) — die
  * OAuth-Routen zogen nur nie nach.

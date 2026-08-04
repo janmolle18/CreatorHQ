@@ -19,22 +19,14 @@ import {
   Table,
   Td,
 } from "@/components/ui";
+import { SOURCE_STATUS } from "@/lib/status";
 import { addSourceAction, createClipsAction, scanChannelAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_LABEL: Record<
-  SourceVideo["status"],
-  { label: string; tone: "ok" | "warn" | "err" | "muted" }
-> = {
-  discovered: { label: "Entdeckt", tone: "muted" },
-  downloading: { label: "Lädt herunter", tone: "warn" },
-  downloaded: { label: "Heruntergeladen", tone: "ok" },
-  clipping: { label: "Clipping läuft", tone: "warn" },
-  clipped: { label: "Geclippt", tone: "ok" },
-  failed: { label: "Fehlgeschlagen", tone: "err" },
-  reference: { label: "Referenz", tone: "muted" },
-};
+// Statustexte aus der Registry (web/lib/status.ts). Die eigene Tabelle hier
+// sagte „Clipping läuft“ — Denglisch, das die Registry längst als
+// „Wird geschnitten“ führt.
 
 const KIND_LABEL: Record<SourceVideo["sourceKind"], string> = {
   youtube_video: "YouTube-Video",
@@ -113,7 +105,7 @@ async function SourcesPageInhalt({
       <PageHeader
         kicker="Quellen-Ingest"
         title="Quellen"
-        description="Davids Quellvideos: per Kanal-Scan oder Link hinzufügen. Geschnitten wird ausschließlich Langmaterial — fertige Shorts landen weiter unten als Referenz und zählen nur für die Analyse."
+        description="Deine Quellvideos: per Kanal-Scan oder Link hinzufügen. Geschnitten wird ausschließlich Langmaterial — fertige Shorts landen weiter unten als Referenz und zählen nur für die Analyse."
         action={
           <Link
             href="/import"
@@ -151,12 +143,12 @@ async function SourcesPageInhalt({
       {videos.length === 0 ? (
         <EmptyState
           title="Noch keine Quellen"
-          hint="„Kanal scannen“ holt alle Videos von Davids Kanal, oder füge einen einzelnen Link ein."
+          hint="„Kanal scannen“ holt alle Videos von devids Kanal, oder füge einen einzelnen Link ein."
         />
       ) : (
         <Table head={["Titel", "Art", "Status", "Dauer", "Aktion"]}>
           {videos.map((video) => {
-            const status = STATUS_LABEL[video.status];
+            const status = SOURCE_STATUS[video.status];
             return (
               <tr key={video.id}>
                 <Td className="max-w-md font-medium">
@@ -206,7 +198,7 @@ async function SourcesPageInhalt({
             Diese Videos sind bereits fertige Kurzvideos. Sie werden{" "}
             <strong className="font-medium text-ink">nie geschnitten oder neu gerendert</strong> —
             aber täglich gemessen. Aus ihren Zahlen lernt das Briefing, welche Formate und Themen
-            bei David funktionieren.
+            bei dir funktionieren.
           </p>
           <Table head={["Titel", "Dauer", "Views", ""]}>
             {referenceVideos.map((video) => {

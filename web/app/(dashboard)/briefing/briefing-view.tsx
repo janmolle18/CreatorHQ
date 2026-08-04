@@ -2,19 +2,13 @@ import { comments, withTenant, type Briefing } from "@creatorhq/db";
 import { requireSession } from "@/lib/auth";
 import { inArray } from "drizzle-orm";
 import { Button, SectionTitle, StatusText } from "@/components/ui";
+import { BRIEFING_STATUS } from "@/lib/status";
 import { adoptContentIdeaAction, adoptReplyCandidateAction } from "./actions";
 
 // Gemeinsame Briefing-Darstellung für „heute" und das Archiv.
 
-const STATUS_LABEL: Record<
-  Briefing["status"],
-  { label: string; tone: "ok" | "warn" | "err" | "muted" }
-> = {
-  pending: { label: "Wartet", tone: "muted" },
-  running: { label: "Läuft", tone: "warn" },
-  completed: { label: "Fertig", tone: "ok" },
-  failed: { label: "Fehlgeschlagen", tone: "err" },
-};
+// Statustexte aus der Registry (web/lib/status.ts) — die eigene Tabelle hier
+// sagte „Läuft“, die Registry „Wird erstellt“.
 
 export async function BriefingView({ briefing }: { briefing: Briefing }) {
   const commentIds = briefing.replyCandidates.map((c) => c.commentId);
@@ -25,7 +19,7 @@ export async function BriefingView({ briefing }: { briefing: Briefing }) {
         )
       : [];
   const commentById = new Map(commentRows.map((row) => [row.externalCommentId, row]));
-  const status = STATUS_LABEL[briefing.status];
+  const status = BRIEFING_STATUS[briefing.status];
 
   return (
     <div className="space-y-14">

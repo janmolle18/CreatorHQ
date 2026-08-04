@@ -20,6 +20,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { ConfirmButton } from "@/components/confirm-button";
 import { CopyButton } from "@/components/copy-button";
 import { Button, EmptyState, Input, PageHeader, StatusText } from "@/components/ui";
+import { POST_PENDING, POST_STATUS } from "@/lib/status";
 import {
   markPublishedAction,
   pushClipNowAction,
@@ -32,20 +33,10 @@ export const dynamic = "force-dynamic";
 // Ein Video = EIN Eintrag: Posts sind pro Clip gruppiert (gemeinsamer
 // Zeitpunkt), jede Plattform ist eine Zeile mit eigenem Push-Knopf.
 
-const STATUS_LABEL: Record<
-  Post["status"],
-  { label: string; tone: "ok" | "warn" | "err" | "muted" }
-> = {
-  draft: { label: "Entwurf", tone: "muted" },
-  scheduled: { label: "Geplant", tone: "ok" },
-  uploading: { label: "Lädt hoch", tone: "warn" },
-  posted: { label: "Übergeben", tone: "ok" },
-  published: { label: "Veröffentlicht", tone: "ok" },
-  awaiting_manual: { label: "Manuell posten", tone: "warn" },
-  failed: { label: "Fehlgeschlagen", tone: "err" },
-};
-
-const PENDING = new Set<Post["status"]>(["draft", "scheduled", "awaiting_manual", "failed"]);
+// Statustexte und Zustandsmengen kommen aus der Registry (web/lib/status.ts).
+// Diese Seite hatte eine eigene Tabelle, die der Registry widersprach: `posted`
+// stand hier auf grün „Übergeben", dort auf gelb „Übergeben — du bist dran".
+// Grün hieß damit „erledigt" für etwas, das noch einen Handgriff braucht.
 
 interface VideoGroup {
   clip: Clip;
@@ -67,7 +58,7 @@ function groupByClip(rows: Array<{ post: Post; clip: Clip }>): VideoGroup[] {
     // Kopfzeit = gemeinsamer Termin der OFFENEN Posts; erst wenn alles
     // draußen ist, zählt die (vergangene) Zeit der veröffentlichten.
     const pendingTimes = clipPosts
-      .filter((post) => PENDING.has(post.status) && post.scheduledAt !== null)
+      .filter((post) => POST_PENDING.has(post.status) && post.scheduledAt !== null)
       .map((post) => post.scheduledAt!) as Date[];
     const allTimes = clipPosts
       .filter((post) => post.scheduledAt !== null)
@@ -76,7 +67,7 @@ function groupByClip(rows: Array<{ post: Post; clip: Clip }>): VideoGroup[] {
     map.set(clipId, {
       clip: clipsById.get(clipId)!,
       posts: clipPosts,
-      pendingCount: clipPosts.filter((post) => PENDING.has(post.status)).length,
+      pendingCount: clipPosts.filter((post) => POST_PENDING.has(post.status)).length,
       when: pool.length > 0 ? new Date(Math.min(...pool.map((d) => d.getTime()))) : null,
     });
   }
@@ -209,7 +200,7 @@ async function PostsPageInhalt({
                   </p>
                   {pendingCount > 1 &&
                     clipPosts.some(
-                      (post) => PENDING.has(post.status) && connected.has(post.platform)
+                      (post) => POST_PENDING.has(post.status) && connected.has(post.platform)
                     ) && (
                       <form action={pushClipNowAction} className="mt-4">
                         <input type="hidden" name="clipId" value={clip.id} />
@@ -227,7 +218,7 @@ async function PostsPageInhalt({
 
                   <div className="mt-4 divide-y divide-hairline border-y border-hairline">
                     {clipPosts.map((post) => {
-                      const status = STATUS_LABEL[post.status];
+                      const status = POST_STATUS[post.status];
                       return (
                         <div
                           key={post.id}
@@ -279,7 +270,7 @@ async function PostsPageInhalt({
                                 </Button>
                               </form>
                             ) : (
-                              PENDING.has(post.status) &&
+                              POST_PENDING.has(post.status) &&
                               connected.has(post.platform) && (
                                 <form action={pushNowAction}>
                                   <input type="hidden" name="postId" value={post.id} />

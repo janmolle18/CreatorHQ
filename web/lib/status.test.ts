@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   ACCOUNT_STATUS,
@@ -77,5 +79,45 @@ describe("postUrgency", () => {
   test("ohne Termin bleibt es unaufgeregt", () => {
     const post = { status: "draft" as const, scheduledAt: null };
     expect(postUrgency(post, now, todayEnd)).toBe("later");
+  });
+});
+
+// ── Wächter: die Registry bleibt die einzige Quelle ────────────────────────
+//
+// Zweimal ist dasselbe passiert: Eine Seite legte sich ihre eigene
+// Statustabelle an, und die Wörter liefen auseinander. `posted` war einmal
+// grün „Übergeben" und einmal gelb „Übergeben — du bist dran" — grün hieß
+// damit „erledigt" für etwas, das noch einen Handgriff braucht. `published`
+// hieß mal „Veröffentlicht", mal „Live". Fünf Seiten waren betroffen.
+//
+// Der Typ erzwingt Vollständigkeit, aber nicht Einzigartigkeit. Das hier schon.
+
+describe("keine eigenen Statustabellen neben der Registry", () => {
+  const SEITEN = path.join(import.meta.dirname, "..", "app");
+
+  /** Namen, unter denen die Duplikate bisher aufgetaucht sind. */
+  const VERDAECHTIG =
+    /const\s+(STATUS_LABEL|POST_CHIP|CLIP_SUBSTATUS|[A-Z_]*STATUS_MAP)\s*[:=]/;
+
+  function dateien(verzeichnis: string, gesammelt: string[] = []): string[] {
+    for (const eintrag of readdirSync(verzeichnis)) {
+      const voll = path.join(verzeichnis, eintrag);
+      if (statSync(voll).isDirectory()) dateien(voll, gesammelt);
+      else if (/\.tsx?$/.test(eintrag)) gesammelt.push(voll);
+    }
+    return gesammelt;
+  }
+
+  test("keine Seite definiert ihre eigene", () => {
+    const treffer = dateien(SEITEN)
+      .filter((datei) => VERDAECHTIG.test(readFileSync(datei, "utf8")))
+      .map((datei) => path.relative(path.join(SEITEN, ".."), datei));
+
+    expect(
+      treffer,
+      "Diese Dateien legen sich eine eigene Statustabelle an. Nimm die Werte " +
+        "aus web/lib/status.ts — sonst heißt dasselbe Wort an zwei Stellen " +
+        "Verschiedenes."
+    ).toEqual([]);
   });
 });

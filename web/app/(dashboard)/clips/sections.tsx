@@ -8,6 +8,7 @@ import {
   type PublishPlatform,
 } from "@creatorhq/shared";
 import { Button, Field, Input, StatusText } from "@/components/ui";
+import { CLIP_STATUS, POST_STATUS } from "@/lib/status";
 import { ConfirmButton } from "@/components/confirm-button";
 import {
   approveClipAction,
@@ -30,24 +31,10 @@ export interface BoardItem {
 
 const LIVE_POST_STATES = new Set(["uploading", "posted", "published"]);
 
-const POST_CHIP: Record<string, { label: string; tone: "ok" | "warn" | "err" | "muted" }> = {
-  draft: { label: "Entwurf", tone: "muted" },
-  scheduled: { label: "Geplant", tone: "ok" },
-  uploading: { label: "Lädt hoch", tone: "warn" },
-  posted: { label: "Übergeben", tone: "warn" },
-  published: { label: "Live", tone: "ok" },
-  awaiting_manual: { label: "Manuell posten", tone: "warn" },
-  failed: { label: "Fehler", tone: "err" },
-};
-
-const CLIP_SUBSTATUS: Record<string, { label: string; tone: "ok" | "warn" | "err" | "muted" }> = {
-  approved: { label: "Wartet auf Render", tone: "warn" },
-  rendering: { label: "Rendert", tone: "warn" },
-  rendered: { label: "Publish-fertig", tone: "ok" },
-  scheduled: { label: "Eingeplant", tone: "ok" },
-  rejected: { label: "Aussortiert", tone: "muted" },
-  failed: { label: "Fehlgeschlagen", tone: "err" },
-};
+// Statustexte kommen aus der Registry (web/lib/status.ts). Diese Datei hatte
+// zwei eigene Tabellen, die der Registry widersprachen: `posted` war hier gelb
+// „Übergeben", `published` hieß „Live" statt „Veröffentlicht", `failed` mal
+// „Fehler" mal „Fehlgeschlagen". Dasselbe Wort muss überall dasselbe heißen.
 
 export function formatWindow(start: number | null, end: number | null): string {
   if (start === null || end === null) return "—";
@@ -133,7 +120,7 @@ function PostChips({ posts, timeZone }: { posts: Post[]; timeZone: string }) {
   return (
     <ul className="flex flex-wrap gap-2">
       {posts.map((post) => {
-        const chip = POST_CHIP[post.status] ?? { label: post.status, tone: "muted" as const };
+        const chip = POST_STATUS[post.status];
         const when =
           post.status === "published" || post.status === "posted"
             ? post.postedAt
@@ -290,10 +277,7 @@ export function ProductionSection({
   return (
     <div className="grid gap-x-10 gap-y-12 md:grid-cols-2 xl:grid-cols-3">
       {items.map(({ clip, posts }) => {
-        const status = CLIP_SUBSTATUS[clip.status] ?? {
-          label: clip.status,
-          tone: "muted" as const,
-        };
+        const status = CLIP_STATUS[clip.status];
         return (
           <article key={clip.id} className="flex flex-col gap-4">
             {clip.renderedPath ? (
@@ -413,10 +397,7 @@ export function ParkedSection({ items }: { items: BoardItem[] }) {
   return (
     <div className="divide-y divide-hairline">
       {items.map(({ clip, sourceTitle }) => {
-        const status = CLIP_SUBSTATUS[clip.status] ?? {
-          label: clip.status,
-          tone: "muted" as const,
-        };
+        const status = CLIP_STATUS[clip.status];
         return (
           <article key={clip.id} className="flex flex-wrap items-baseline gap-x-6 gap-y-3 py-4">
             <div className="w-36 shrink-0">

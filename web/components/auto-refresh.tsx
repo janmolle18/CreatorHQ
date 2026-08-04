@@ -10,7 +10,7 @@ const RUHE_INTERVALL_MS = 60_000;
  * Lädt die Serverdaten periodisch nach (Listen mit laufenden Jobs).
  *
  * Drei Rücksichten, die vorher fehlten:
- * - Nicht aktualisieren, während David in einem Feld tippt — sonst springt
+ * - Nicht aktualisieren, während jemand in einem Feld tippt — sonst springt
  *   ihm die Karte unter dem Cursor weg.
  * - Nicht aktualisieren, wenn der Tab im Hintergrund liegt.
  * - Nur schnell takten, wenn wirklich etwas läuft (`active`); sonst im

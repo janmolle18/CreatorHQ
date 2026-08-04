@@ -39,7 +39,7 @@ export default async function ImportPage() {
       <PageHeader
         kicker="Quellen-Ingest"
         title="Instagram-Import"
-        description="Davids fertige Instagram-Clips als mp4 hochladen. Sie landen direkt als publish-fertige Clips im System; der Worker prüft Dauer und 9:16-Format."
+        description="Fertige Instagram-Clips als mp4 hochladen. Sie landen direkt als publish-fertige Clips im System; der Worker prüft Dauer und 9:16-Format."
         action={
           <Link
             href="/sources"

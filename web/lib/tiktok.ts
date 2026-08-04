@@ -22,16 +22,16 @@ export function generatePkce(): { verifier: string; challenge: string } {
 }
 
 /**
- * Berechtigungen, denen David beim Verbinden zustimmt.
+ * Berechtigungen, denen der Creator beim Verbinden zustimmt.
  *
  * `video.publish` ist bewusst IMMER dabei — auch solange `TIKTOK_DIRECT_POST`
  * noch aus ist. Der Umfang der Zustimmung wird beim Verbinden festgeschrieben:
  * Würden wir die Berechtigung erst nach dem TikTok-Audit anfordern, müsste
- * David ein zweites Mal durch den ganzen Verbindungsvorgang. Ob wirklich direkt
+ * den Creator ein zweites Mal durch den ganzen Verbindungsvorgang. Ob wirklich direkt
  * veröffentlicht wird, entscheidet weiterhin allein das Flag im Worker.
  *
  * Sollte die Sandbox eine noch nicht freigegebene Berechtigung ablehnen, fällt
- * das beim Anlegen der App auf — nicht erst in Davids Termin.
+ * das beim Anlegen der App auf — nicht erst beim Verbinden.
  */
 export const TIKTOK_SCOPES = [
   "user.info.basic",

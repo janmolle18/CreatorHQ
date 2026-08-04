@@ -5,12 +5,12 @@ const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 /**
- * Berechtigungen, denen David beim Verbinden zustimmt.
+ * Berechtigungen, denen der Creator beim Verbinden zustimmt.
  *
  * `youtube.force-ssl` ist Pflicht, um Kommentare zu beantworten. Sie steht
  * hier, obwohl die Antwort-Funktion selbst noch nicht gebaut ist: Der Umfang
  * der Zustimmung wird beim Verbinden festgeschrieben — nachträglich ergänzen
- * hieße, David noch einmal durch den ganzen Vorgang zu schicken.
+ * hieße, den Creator noch einmal durch den ganzen Vorgang zu schicken.
  *
  * Die Berechtigung muss zusätzlich im Google-Zustimmungsbildschirm eingetragen
  * sein, sonst lehnt Google sie beim Verbinden ab.

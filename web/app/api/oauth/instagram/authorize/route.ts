@@ -4,7 +4,8 @@ import { randomBytes } from "node:crypto";
 import { getSession } from "@/lib/auth";
 import { getInstagramAuthorizeUrl, instagramConfig } from "@/lib/instagram";
 
-// Startet den Instagram-Login-Flow (Dev-Modus: David muss Instagram-Tester sein).
+// Startet den Instagram-Login-Flow (Entwicklungsmodus: der Creator muss als
+// Instagram-Tester bestätigt sein).
 export async function GET(req: NextRequest) {
   if (!(await getSession())) {
     return NextResponse.redirect(appUrl(req, "/login"));
