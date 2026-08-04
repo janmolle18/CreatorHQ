@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { Button, Input, StatusText } from "@/components/ui";
+import { RechtsFussleiste } from "@/components/rechts-fussleiste";
 import { loginAction } from "./actions";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -75,6 +76,7 @@ export default async function LoginPage({
             Kanal anlegen
           </Link>
         </p>
+        <RechtsFussleiste />
       </div>
     </main>
   );

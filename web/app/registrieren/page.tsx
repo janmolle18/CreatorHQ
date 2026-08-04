@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { Button, Input, StatusText } from "@/components/ui";
+import { RechtsFussleiste } from "@/components/rechts-fussleiste";
 import { registerAction } from "../login/actions";
 
 export default async function RegistrierenPage({
@@ -91,6 +92,7 @@ export default async function RegistrierenPage({
             Anmelden
           </Link>
         </p>
+        <RechtsFussleiste />
       </div>
     </main>
   );

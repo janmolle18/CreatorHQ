@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { requireSession } from "@/lib/auth";
 import { NavLink } from "@/components/nav-link";
+import { RechtsFussleiste } from "@/components/rechts-fussleiste";
 import { logoutAction } from "@/app/login/actions";
 
 // Alltag zuerst, Verwaltung abgesetzt darunter. Die Reihenfolge folgt dem
@@ -82,6 +83,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               ))}
             </div>
           </nav>
+        </div>
+
+        <div className="mt-6 md:mt-0">
+          <RechtsFussleiste />
         </div>
 
         <form action={logoutAction} className="mt-6 md:mt-0">

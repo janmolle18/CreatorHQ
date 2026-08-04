@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { Button, StatusText } from "@/components/ui";
+import { RechtsFussleiste } from "@/components/rechts-fussleiste";
 import { logoutAction, sendeBestaetigungErneutAction } from "../login/actions";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +72,7 @@ export default async function BestaetigenPage({
             Falsche Adresse angegeben?
           </Link>
         </div>
+        <RechtsFussleiste />
       </div>
     </main>
   );

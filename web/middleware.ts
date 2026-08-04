@@ -17,6 +17,10 @@ const PUBLIC_PREFIXES = [
   // Rechner registriert hat — dort gibt es keine Sitzung. Das Token selbst ist
   // der Nachweis; die Seite entscheidet, was sie zeigt.
   "/bestaetigen",
+  // Impressum, Datenschutz und AGB muessen ohne Anmeldung erreichbar sein:
+  // Ein Impressum hinter einem Login erfuellt seinen Zweck nicht, und Google
+  // wie Meta pruefen die Datenschutzerklaerung im Rahmen der App-Freigabe.
+  "/rechtliches",
   "/api/oauth",
   "/api/public-media",
 ];

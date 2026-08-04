@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button, Input, StatusText } from "@/components/ui";
+import { RechtsFussleiste } from "@/components/rechts-fussleiste";
 import { requestPasswortResetAction } from "../login/actions";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,7 @@ export default async function PasswortVergessenPage({
             Anmelden
           </Link>
         </p>
+        <RechtsFussleiste />
       </div>
     </main>
   );
