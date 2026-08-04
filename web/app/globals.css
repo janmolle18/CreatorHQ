@@ -68,6 +68,10 @@
   --zeit-fast: 120ms;
   --zeit-normal: 220ms;
   --kurve: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Leichter Überschwung beim Loslassen — ein Knopf, der zurückfedert, fühlt
+     sich an wie ein Schalter statt wie ein Bild. Nur hier, nicht überall: Auf
+     Flächen wirkt Überschwung wackelig. */
+  --kurve-feder: cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 @layer base {
@@ -153,6 +157,136 @@
   border-radius: 10px;
 }
 
+/* ── Knöpfe ──────────────────────────────────────────────────────────────────
+   Die gemeinsame Grundlage aller Knopf-Varianten. Farben setzt buttonClasses()
+   in web/components/ui.tsx; hier steht nur, wie sich ein Knopf ANFÜHLT.
+
+   Warum das in CSS steht und nicht in Utility-Klassen: Der Glanz und das
+   Leuchten sind Pseudo-Elemente. Sie werden über `opacity` ein- und
+   ausgeblendet, nicht über `box-shadow` oder `background-position` — nur
+   `opacity` und `transform` laufen im Compositor und kosten kein Neuzeichnen.
+
+   Die drei Zustände sind bewusst unterscheidbar, nicht nur schattiert:
+     ruhend  → liegt auf der Fläche
+     hover   → hebt sich 1 px, Glanz wandert einmal durch
+     gedrückt → senkt sich UNTER die Ruhelage und wird minimal kleiner */
+.knopf {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    transform var(--zeit-fast) var(--kurve-feder),
+    background-color var(--zeit-fast) linear,
+    color var(--zeit-fast) linear;
+}
+
+/* Das Leuchten unter dem Knopf — nur beim Zeigen sichtbar. */
+.knopf::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity var(--zeit-normal) var(--kurve);
+  box-shadow: var(--schatten-hoch);
+}
+
+/* Der Glanz: ein schräges Lichtband, das einmal durchwandert. Es liegt außen
+   und wird bei Hover quer über die Fläche geschoben — reine Transform-Animation. */
+.knopf::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  left: -60%;
+  width: 40%;
+  z-index: -1;
+  transform: translateX(-180%) rotate(18deg);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.16),
+    transparent
+  );
+  transition: transform 620ms var(--kurve);
+}
+
+.knopf:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.knopf:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.knopf:hover:not(:disabled)::after {
+  transform: translateX(420%) rotate(18deg);
+}
+
+/* Unter die Ruhelage, nicht nur zurück auf sie: Der Weg nach unten ist das,
+   was den Druck spürbar macht. */
+.knopf:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+  transition-duration: 60ms;
+}
+
+.knopf:disabled {
+  transform: none;
+}
+
+/* Läuft gerade: ein Balken wandert an der Unterkante entlang. Sagt „ich
+   arbeite" ohne Kreisel — und ohne die Knopfbreite anzufassen. */
+.knopf[data-laeuft="ja"]::after {
+  content: "";
+  top: auto;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  z-index: 1;
+  transform: none;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    currentColor,
+    transparent
+  );
+  opacity: 0.85;
+  animation: knopf-balken 1.1s var(--kurve) infinite;
+  transition: none;
+}
+
+@keyframes knopf-balken {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ── Anfassbare Flächen ──────────────────────────────────────────────────────
+   Für Karten und Zeilen, hinter denen eine Handlung steckt. Der Unterschied zu
+   einer reinen Anzeigefläche muss sichtbar sein, BEVOR man klickt. */
+.zieht-an {
+  transition: transform var(--zeit-normal) var(--kurve);
+}
+
+.zieht-an:hover {
+  transform: translateY(-2px);
+}
+
+/* Tabellenzeilen: ruhig, aber die Zeile unter dem Zeiger hebt sich ab. */
+.zeilen-hover tbody tr {
+  transition: background-color var(--zeit-fast) linear;
+}
+
+.zeilen-hover tbody tr:hover {
+  background-color: rgb(255 255 255 / 0.022);
+}
+
 /* ── Aufnahmelicht ───────────────────────────────────────────────────────────
    Der einzige Ort, an dem sich von selbst etwas bewegt: „läuft gerade".
    Bewegung nur dort, wo sie eine Aussage trägt. */
@@ -204,8 +338,14 @@
   animation-delay: calc(var(--i, 0) * 45ms);
 }
 
-/* Wer Bewegung reduziert haben will, bekommt sie nicht — inklusive des
-   Aufnahmelichts, das sonst dauerhaft blinkt. */
+/* ── Bewegung abschalten ─────────────────────────────────────────────────────
+   Wer Bewegung reduziert haben will, bekommt sie nicht — inklusive des
+   Aufnahmelichts, das sonst dauerhaft blinkt.
+
+   Die Dauer auf null zu setzen reicht NICHT: Ein Knopf, der beim Zeigen um
+   1 px springt statt zu gleiten, ist für genau die Menschen schlimmer, die
+   diese Einstellung gesetzt haben. Deshalb werden die Verschiebungen selbst
+   zurückgenommen und die Zustände stattdessen über Helligkeit angezeigt. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -213,6 +353,23 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .knopf:hover:not(:disabled),
+  .knopf:active:not(:disabled),
+  .zieht-an:hover {
+    transform: none;
+  }
+
+  /* Der Glanz wandert nicht — er entfällt ganz. */
+  .knopf::after {
+    display: none;
+  }
+
+  /* Das Aufnahmelicht bleibt sichtbar, es hört nur auf zu pulsen. */
+  .laeuft::before {
+    animation: none;
+    opacity: 1;
   }
 }
 

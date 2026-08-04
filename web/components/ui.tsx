@@ -94,7 +94,11 @@ export function Table({
 }) {
   return (
     <div className={cards ? "" : "overflow-x-auto"}>
-      <table className={`w-full border-collapse text-sm ${cards ? "table-cards" : ""}`}>
+      {/* zeilen-hover: Die Zeile unter dem Zeiger hebt sich ab. In langen
+          Tabellen ist das der Unterschied zwischen Lesen und Suchen. */}
+      <table
+        className={`zeilen-hover w-full border-collapse text-sm ${cards ? "table-cards" : ""}`}
+      >
         <thead>
           <tr className="border-b border-hairline">
             {head.map((label, index) => (
@@ -163,7 +167,9 @@ export function buttonClasses(variant: ButtonVariant = "primary", extra = ""): s
       : variant === "danger"
         ? "border border-err/40 text-err hover:border-err hover:bg-err/[0.08]"
         : "bg-raised text-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.06)] hover:bg-raised/70";
-  return `inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-meta font-medium tracking-wide transition-[background-color,box-shadow,transform] duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40 ${styles} ${extra}`;
+  // `knopf` bringt das Verhalten mit (Heben, Glanz, Druckpunkt, Laufbalken) —
+  // siehe globals.css. Hier stehen nur noch Maße und Farbe.
+  return `knopf inline-flex min-h-11 select-none items-center justify-center rounded-lg px-4 text-meta font-medium tracking-wide disabled:cursor-not-allowed disabled:opacity-40 ${styles} ${extra}`;
 }
 
 export function Button({
@@ -180,13 +186,25 @@ export function Button({
  */
 export function TextButton({
   className = "",
+  children,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className={`-mx-2 inline-flex min-h-11 items-center px-2 text-label font-medium uppercase tracking-[0.14em] text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
+      className={`group/tb -mx-2 inline-flex min-h-11 items-center px-2 text-label font-medium uppercase tracking-[0.14em] text-ink-soft transition-colors duration-150 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
       {...props}
-    />
+    >
+      <span className="relative">
+        {children}
+        {/* Der Unterstrich wächst aus der Mitte, statt schlagartig da zu sein —
+            über scaleX, damit kein Umbruch neu gerechnet wird. Bei reduzierter
+            Bewegung steht er ohne Übergang sofort. */}
+        <span
+          aria-hidden="true"
+          className="absolute -bottom-0.5 left-0 h-px w-full origin-center scale-x-0 bg-current transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/tb:scale-x-100 motion-reduce:transition-none"
+        />
+      </span>
+    </button>
   );
 }
 
@@ -226,8 +244,12 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 
 // Auf dunklem Grund reicht ein Unterstrich nicht: Das Feld braucht eine eigene
 // Fläche, sonst ist nicht erkennbar, wo man hineinschreiben kann.
+//
+// Beim Hineinschreiben legt sich ein Akzent-Ring um das Feld. Das ist bewusst
+// ein `box-shadow` und keine `border`: Eine wachsende Rahmenbreite würde das
+// Feld um zwei Pixel verschieben und die ganze Zeile neu umbrechen lassen.
 const FIELD_BASE =
-  "w-full rounded-lg border border-hairline bg-panel px-3 py-2.5 text-[15px] text-ink transition-colors placeholder:text-ink-faint hover:border-ink-faint/60 focus:border-accent";
+  "w-full rounded-lg border border-hairline bg-panel px-3 py-2.5 text-[15px] text-ink shadow-[0_0_0_0_rgb(124_92_255/0)] transition-[border-color,box-shadow] duration-200 placeholder:text-ink-faint hover:border-ink-faint/60 focus:border-accent focus:shadow-[0_0_0_3px_rgb(124_92_255/0.18)] focus:outline-none";
 
 export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`${FIELD_BASE} ${className}`} {...props} />;
@@ -277,8 +299,19 @@ export function Checkbox({
 }
 
 /** Abgesetzte Fläche für gruppierte Inhalte — bewusst flach, nur Haarlinie. */
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`flaeche p-5 ${className}`}>{children}</div>;
+export function Card({
+  children,
+  className = "",
+  anfassbar = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** Hinter der Karte steckt eine Handlung — dann hebt sie sich beim Zeigen. */
+  anfassbar?: boolean;
+}) {
+  return (
+    <div className={`flaeche p-5 ${anfassbar ? "zieht-an" : ""} ${className}`}>{children}</div>
+  );
 }
 
 export function Badge({ children }: { children: ReactNode }) {

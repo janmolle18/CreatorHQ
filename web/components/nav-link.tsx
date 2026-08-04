@@ -3,6 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+/**
+ * Menüpunkt mit Zustand.
+ *
+ * Die Akzentmarke des aktiven Punktes fährt aus der Mitte heraus (scaleY)
+ * statt einfach da zu sein — das ist der eine Ort im Menü, an dem Farbe
+ * auftaucht, und die Bewegung führt den Blick dorthin. Beim Zeigen rückt die
+ * Beschriftung zwei Pixel nach, damit auch der inaktive Punkt antwortet.
+ *
+ * Alles über `transform`: Eine wachsende Rahmenbreite würde die Beschriftung
+ * verschieben und bei jedem Zeigen einen Umbruch auslösen.
+ */
 export function NavLink({
   href,
   label,
@@ -19,15 +30,22 @@ export function NavLink({
     return (
       <Link
         href={href}
-        // Der aktive Punkt trägt die Akzentmarke — das ist der eine Ort, an dem
-        // im Menü Farbe auftaucht, und dadurch sofort auffindbar.
-        className={`-ml-px rounded-r-md border-l-2 py-1.5 pl-4 text-sm transition-colors ${
+        aria-current={active ? "page" : undefined}
+        className={`group/nav relative rounded-r-md py-1.5 pl-4 text-sm transition-colors duration-150 ${
           active
-            ? "border-accent bg-accent/[0.07] font-medium text-ink"
-            : "border-transparent text-ink-soft hover:bg-raised/60 hover:text-ink"
+            ? "bg-accent/[0.07] font-medium text-ink"
+            : "text-ink-soft hover:bg-raised/60 hover:text-ink"
         }`}
       >
-        {label}
+        <span
+          aria-hidden="true"
+          className={`absolute inset-y-0 left-0 w-[2px] origin-center rounded-full bg-accent transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+            active ? "scale-y-100" : "scale-y-0 group-hover/nav:scale-y-50"
+          }`}
+        />
+        <span className="inline-block transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/nav:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover/nav:translate-x-0">
+          {label}
+        </span>
       </Link>
     );
   }
@@ -35,13 +53,18 @@ export function NavLink({
   return (
     <Link
       href={href}
-      className={`whitespace-nowrap pb-2 text-sm transition-colors ${
-        active
-          ? "border-b-2 border-accent font-medium text-ink"
-          : "border-b-2 border-transparent text-ink-soft hover:text-ink"
+      aria-current={active ? "page" : undefined}
+      className={`group/nav relative whitespace-nowrap pb-2 text-sm transition-colors duration-150 ${
+        active ? "font-medium text-ink" : "text-ink-soft hover:text-ink"
       }`}
     >
       {label}
+      <span
+        aria-hidden="true"
+        className={`absolute inset-x-0 bottom-0 h-[2px] origin-center rounded-full bg-accent transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+          active ? "scale-x-100" : "scale-x-0 group-hover/nav:scale-x-50"
+        }`}
+      />
     </Link>
   );
 }
