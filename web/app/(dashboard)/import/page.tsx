@@ -11,6 +11,7 @@ import {
   Table,
   Td,
 } from "@/components/ui";
+import { CLIP_STATUS } from "@/lib/status";
 import { UploadForm } from "./upload-form";
 
 export const dynamic = "force-dynamic";
@@ -66,8 +67,11 @@ export default async function ImportPage() {
             <tr key={clip.id}>
               <Td className="max-w-md font-medium">{clip.title ?? clip.id}</Td>
               <Td>
-                <StatusText tone={clip.status === "failed" ? "err" : "ok"}>
-                  {clip.status === "failed" ? "Fehlgeschlagen" : "Publish-fertig"}
+                {/* Aus der Registry, nicht von Hand: Hier stand als Einzige
+                    noch Entwicklersprache, mitten im JSX statt in einer
+                    Tabelle — und rutschte deshalb am Wächter vorbei. */}
+                <StatusText tone={CLIP_STATUS[clip.status].tone}>
+                  {CLIP_STATUS[clip.status].label}
                 </StatusText>
               </Td>
               <Td>

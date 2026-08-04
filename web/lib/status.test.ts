@@ -108,6 +108,44 @@ describe("keine eigenen Statustabellen neben der Registry", () => {
     return gesammelt;
   }
 
+  /**
+   * Wörter, welche die Registry ersetzt hat.
+   *
+   * Der Tabellen-Wächter oben sieht nur `const STATUS_LABEL = {…}`. Genau
+   * daran ist eine sechste Stelle vorbeigerutscht: In import/page.tsx stand
+   * das Label als Ternär mitten im JSX (`clip.status === "failed" ? … :
+   * "Publish-fertig"`). Deshalb zusätzlich die abgelösten Wörter selbst.
+   */
+  const ABGELOESTE_WOERTER = [
+    "Publish-fertig",
+    "Clipping läuft",
+    "Wartet auf Render",
+    "Lädt herunter",
+    "Geclippt",
+  ];
+
+  test("abgeloeste Woerter kommen nicht mehr vor", () => {
+    const treffer = dateien(SEITEN)
+      .map((datei) => ({
+        datei: path.relative(path.join(SEITEN, ".."), datei),
+        // Nur Zeilen ohne Kommentarzeichen: Die Begründung, warum ein Wort
+        // abgelöst wurde, darf es selbstverständlich nennen.
+        worte: ABGELOESTE_WOERTER.filter((wort) =>
+          readFileSync(datei, "utf8")
+            .split("\n")
+            .some((zeile) => zeile.includes(wort) && !zeile.trimStart().startsWith("//"))
+        ),
+      }))
+      .filter(({ worte }) => worte.length > 0)
+      .map(({ datei, worte }) => `${datei}: ${worte.join(", ")}`);
+
+    expect(
+      treffer,
+      "Diese Wörter hat die Registry ersetzt. Nimm den Text aus " +
+        "web/lib/status.ts, statt ihn erneut von Hand zu schreiben."
+    ).toEqual([]);
+  });
+
   test("keine Seite definiert ihre eigene", () => {
     const treffer = dateien(SEITEN)
       .filter((datei) => VERDAECHTIG.test(readFileSync(datei, "utf8")))
