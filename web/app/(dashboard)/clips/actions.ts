@@ -1,11 +1,11 @@
 "use server";
 
-import { db, clips, posts } from "@creatorhq/db";
+import { clips, posts } from "@creatorhq/db";
 import { publishTargetsSchema } from "@creatorhq/shared";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireSession } from "@/lib/auth";
+import { mitMandant, requireSession } from "@/lib/auth";
 import { renderQueue } from "@/lib/queues";
 import { deleteObject } from "@/lib/storage";
 
@@ -31,7 +31,6 @@ function parseHashtags(raw: string): string[] {
 }
 
 export async function approveClipAction(formData: FormData): Promise<void> {
-  await requireSession();
   const clipId = String(formData.get("clipId") ?? "");
   const parsed = publishTargetsSchema.safeParse(
     formData.getAll("targets").map(String)
@@ -41,38 +40,44 @@ export async function approveClipAction(formData: FormData): Promise<void> {
     redirect("/clips?error=" + encodeURIComponent("Mindestens eine Ziel-Plattform wählen"));
   }
 
-  await db
-    .update(clips)
-    .set({ status: "approved", targets: parsed.data, updatedAt: new Date() })
-    .where(eq(clips.id, clipId));
+  // Kein zusätzliches WHERE auf den Mandanten nötig: Gehört der Clip einem
+  // anderen Creator, sieht die Datenbank ihn hier gar nicht.
+  await mitMandant((db) =>
+    db
+      .update(clips)
+      .set({ status: "approved", targets: parsed.data, updatedAt: new Date() })
+      .where(eq(clips.id, clipId))
+  );
 
   revalidatePath("/clips");
   redirect("/clips?approved=1");
 }
 
 export async function rejectClipAction(formData: FormData): Promise<void> {
-  await requireSession();
   const clipId = String(formData.get("clipId") ?? "");
   if (!clipId) return;
 
-  await db
-    .update(clips)
-    .set({ status: "rejected", updatedAt: new Date() })
-    .where(eq(clips.id, clipId));
+  await mitMandant((db) =>
+    db
+      .update(clips)
+      .set({ status: "rejected", updatedAt: new Date() })
+      .where(eq(clips.id, clipId))
+  );
 
   revalidatePath("/clips");
 }
 
 /** Aussortierten (rejected/failed) Clip zurück in die Freigabe holen. */
 export async function restoreClipAction(formData: FormData): Promise<void> {
-  await requireSession();
   const clipId = String(formData.get("clipId") ?? "");
   if (!clipId) return;
 
-  await db
-    .update(clips)
-    .set({ status: "candidate", error: null, updatedAt: new Date() })
-    .where(eq(clips.id, clipId));
+  await mitMandant((db) =>
+    db
+      .update(clips)
+      .set({ status: "candidate", error: null, updatedAt: new Date() })
+      .where(eq(clips.id, clipId))
+  );
 
   revalidatePath("/clips");
 }
@@ -83,34 +88,39 @@ export async function restoreClipAction(formData: FormData): Promise<void> {
  * Analytics-Historie veröffentlichter Posts bleibt damit unantastbar.
  */
 export async function deleteClipAction(formData: FormData): Promise<void> {
-  await requireSession();
   const clipId = String(formData.get("clipId") ?? "");
   if (!clipId) return;
 
-  const [clip] = await db.select().from(clips).where(eq(clips.id, clipId));
-  if (!clip) {
-    revalidatePath("/clips");
-    return;
-  }
+  // redirect() steht bewusst NACH dem Block: Innerhalb der Transaktion wäre
+  // die geworfene Umleitung ein Abbruch und würde das Löschen zurücknehmen.
+  const ergebnis = await mitMandant(async (db) => {
+    const [clip] = await db.select().from(clips).where(eq(clips.id, clipId));
+    if (!clip) return "weg" as const;
 
-  const clipPosts = await db.select().from(posts).where(eq(posts.clipId, clipId));
-  if (clipPosts.some((post) => LIVE_POST_STATES.has(post.status))) {
+    const clipPosts = await db.select().from(posts).where(eq(posts.clipId, clipId));
+    if (clipPosts.some((post) => LIVE_POST_STATES.has(post.status))) {
+      return "live" as const;
+    }
+
+    if (clip.renderedPath) {
+      try {
+        await deleteObject(clip.renderedPath);
+      } catch {
+        // Storage-Leiche ist verschmerzbar — der Datensatz soll trotzdem weg.
+      }
+    }
+    await db.delete(clips).where(eq(clips.id, clipId));
+    return "geloescht" as const;
+  });
+
+  revalidatePath("/clips");
+  if (ergebnis === "weg") return;
+  if (ergebnis === "live") {
     redirect(
       "/clips?error=" +
         encodeURIComponent("Clip hat veröffentlichte Posts und kann nicht gelöscht werden")
     );
   }
-
-  if (clip.renderedPath) {
-    try {
-      await deleteObject(clip.renderedPath);
-    } catch {
-      // Storage-Leiche ist verschmerzbar — der Datensatz soll trotzdem weg.
-    }
-  }
-  await db.delete(clips).where(eq(clips.id, clipId));
-
-  revalidatePath("/clips");
   redirect("/clips?deleted=1");
 }
 
@@ -120,7 +130,6 @@ export async function deleteClipAction(formData: FormData): Promise<void> {
  * Leeres Feld = Clip wird ohne Untertitel gerendert.
  */
 export async function updateSubtitlesAction(formData: FormData): Promise<void> {
-  await requireSession();
   const clipId = String(formData.get("clipId") ?? "");
   if (!clipId) return;
 
@@ -136,16 +145,17 @@ export async function updateSubtitlesAction(formData: FormData): Promise<void> {
     );
   }
 
-  await db
-    .update(clips)
-    .set({ subtitles: raw || null, updatedAt: new Date() })
-    .where(eq(clips.id, clipId));
+  await mitMandant((db) =>
+    db
+      .update(clips)
+      .set({ subtitles: raw || null, updatedAt: new Date() })
+      .where(eq(clips.id, clipId))
+  );
 
   revalidatePath("/clips");
 }
 
 export async function updateClipAction(formData: FormData): Promise<void> {
-  await requireSession();
   const clipId = String(formData.get("clipId") ?? "");
   if (!clipId) return;
 
@@ -153,33 +163,37 @@ export async function updateClipAction(formData: FormData): Promise<void> {
   const caption = String(formData.get("caption") ?? "").trim();
   const hashtags = parseHashtags(String(formData.get("hashtags") ?? ""));
 
-  await db
-    .update(clips)
-    .set({
-      title: title || null,
-      caption: caption || null,
-      hashtags,
-      updatedAt: new Date(),
-    })
-    .where(eq(clips.id, clipId));
+  await mitMandant((db) =>
+    db
+      .update(clips)
+      .set({
+        title: title || null,
+        caption: caption || null,
+        hashtags,
+        updatedAt: new Date(),
+      })
+      .where(eq(clips.id, clipId))
+  );
 
   revalidatePath("/clips");
 }
 
 export async function reRenderClipAction(formData: FormData): Promise<void> {
-  await requireSession();
+  const session = await requireSession();
   const clipId = String(formData.get("clipId") ?? "");
   if (!clipId) return;
 
   await renderQueue().add(
     "render",
-    { clipId, force: true },
+    { tenantId: session.tenantId, clipId, force: true },
     { jobId: `rerender-${clipId}-${Date.now()}` }
   );
-  await db
-    .update(clips)
-    .set({ status: "rendering", updatedAt: new Date() })
-    .where(eq(clips.id, clipId));
+  await mitMandant((db) =>
+    db
+      .update(clips)
+      .set({ status: "rendering", updatedAt: new Date() })
+      .where(eq(clips.id, clipId))
+  );
 
   revalidatePath("/clips");
 }

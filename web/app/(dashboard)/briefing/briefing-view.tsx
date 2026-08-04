@@ -1,4 +1,5 @@
-import { comments, db, type Briefing } from "@creatorhq/db";
+import { comments, withTenant, type Briefing } from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import { inArray } from "drizzle-orm";
 import { Button, SectionTitle, StatusText } from "@/components/ui";
 import { adoptContentIdeaAction, adoptReplyCandidateAction } from "./actions";
@@ -19,7 +20,9 @@ export async function BriefingView({ briefing }: { briefing: Briefing }) {
   const commentIds = briefing.replyCandidates.map((c) => c.commentId);
   const commentRows =
     commentIds.length > 0
-      ? await db.select().from(comments).where(inArray(comments.externalCommentId, commentIds))
+      ? await withTenant((await requireSession()).tenantId, (db) =>
+          db.select().from(comments).where(inArray(comments.externalCommentId, commentIds))
+        )
       : [];
   const commentById = new Map(commentRows.map((row) => [row.externalCommentId, row]));
   const status = STATUS_LABEL[briefing.status];

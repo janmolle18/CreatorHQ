@@ -1,4 +1,4 @@
-import { db, clips } from "@creatorhq/db";
+import { clips, withTenant } from "@creatorhq/db";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { presignGet } from "@/lib/storage";
@@ -13,17 +13,27 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await getSession())) {
+  const session = await getSession();
+  if (!session) {
     return new Response("Nicht angemeldet", { status: 401 });
   }
 
+  // Die Mandantengrenze ist hier die ganze Zugriffsprüfung: Ein fremder Clip
+  // ist innerhalb der Grenze schlicht nicht vorhanden, die Antwort ist 404.
+  // Ohne sie fand die Abfrage gar nichts — auch nicht den eigenen Clip.
   const { id } = await params;
-  const [clip] = await db.select().from(clips).where(eq(clips.id, id));
-  if (!clip?.renderedPath) {
+  const renderedPath = await withTenant(session.tenantId, async (db) => {
+    const [clip] = await db
+      .select({ renderedPath: clips.renderedPath })
+      .from(clips)
+      .where(eq(clips.id, id));
+    return clip?.renderedPath ?? null;
+  });
+  if (!renderedPath) {
     return new Response("Clip noch nicht gerendert", { status: 404 });
   }
 
-  const url = await presignGet(clip.renderedPath);
+  const url = await presignGet(renderedPath);
   const range = req.headers.get("range");
 
   let upstream: Response;

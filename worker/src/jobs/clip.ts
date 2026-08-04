@@ -106,6 +106,7 @@ export async function processClip(job: Job<SourceVideoJob>): Promise<void> {
 
     try {
       const candidates = await provider.findClips({
+        db,
         sourceFilePath: localSource,
         sourceVideoId,
         maxCandidates: env.clip.maxCandidates,

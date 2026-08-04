@@ -156,7 +156,7 @@ async function publishTiktok(
 
   let localPath: string | null = null;
   try {
-    const accessToken = await withFreshToken(accountId);
+    const accessToken = await withFreshToken(db, accountId);
     localPath = await downloadKeyToTmp(
       clip.renderedPath,
       `publish-${post.id}.mp4`,
@@ -214,7 +214,7 @@ async function publishYoutube(db: DB, post: Post): Promise<void> {
 
   let localPath: string | null = null;
   try {
-    const accessToken = await withFreshToken(accountId);
+    const accessToken = await withFreshToken(db, accountId);
     localPath = await downloadKeyToTmp(
       clip.renderedPath,
       `publish-${post.id}.mp4`,
@@ -326,7 +326,7 @@ async function publishInstagram(
       return;
     }
 
-    const accessToken = await withFreshToken(accountId);
+    const accessToken = await withFreshToken(db, accountId);
     const videoUrl = getPublicMediaUrl(clip.renderedPath);
     const containerId = await createReelContainer({
       igUserId,

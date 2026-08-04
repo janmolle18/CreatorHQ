@@ -1,6 +1,6 @@
 "use server";
 
-import { briefings, comments, db, ideas } from "@creatorhq/db";
+import { briefings, comments, ideas } from "@creatorhq/db";
 import { isPublishPlatform } from "@creatorhq/shared";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";

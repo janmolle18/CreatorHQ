@@ -156,7 +156,7 @@ async function collectYoutube(
   let written = 0;
 
   if (connected?.status === "connected") {
-    const token = await withFreshToken(connected.id);
+    const token = await withFreshToken(db, connected.id);
     authHeader = { Authorization: `Bearer ${token}` };
     const res = await fetchWithRetry(
       `${YT_API}/channels?part=statistics&mine=true`,
@@ -280,7 +280,7 @@ async function collectInstagram(
     logger.info("analytics: Instagram übersprungen (nicht verbunden)");
     return 0;
   }
-  const token = await withFreshToken(account.id);
+  const token = await withFreshToken(db, account.id);
   let written = 0;
 
   const meRes = await fetchWithRetry(
@@ -336,7 +336,7 @@ async function collectTiktok(
     logger.info("analytics: TikTok übersprungen (nicht verbunden)");
     return 0;
   }
-  const token = await withFreshToken(account.id);
+  const token = await withFreshToken(db, account.id);
   const res = await fetchWithRetry(
     "https://open.tiktokapis.com/v2/video/list/?fields=id,view_count,like_count,comment_count,share_count",
     {

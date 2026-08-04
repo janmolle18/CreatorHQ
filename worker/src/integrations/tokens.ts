@@ -1,4 +1,4 @@
-import { db, socialAccounts, type SocialAccount } from "@creatorhq/db";
+import { socialAccounts, type DB, type SocialAccount } from "@creatorhq/db";
 import { decryptSecret, encryptSecret } from "@creatorhq/shared";
 import { eq } from "drizzle-orm";
 import { logger } from "../logger.ts";
@@ -51,7 +51,7 @@ async function refreshForPlatform(
 const REFRESH_LEEWAY_MS = 5 * 60 * 1000;
 const LOCK_TTL_MS = 30_000;
 
-async function loadAccount(accountId: string): Promise<SocialAccount | null> {
+async function loadAccount(db: DB, accountId: string): Promise<SocialAccount | null> {
   const [account] = await db
     .select()
     .from(socialAccounts)
@@ -62,9 +62,14 @@ async function loadAccount(accountId: string): Promise<SocialAccount | null> {
 /**
  * Liefert ein gültiges Access-Token (refresht unter Lock, wenn nötig).
  * Bei invalid_grant: Account → "expired" (UI zeigt „Neu verbinden") + Throw.
+ *
+ * Das Mandanten-Handle wird durchgereicht, nicht aus dem Modul geholt. Mit dem
+ * globalen Handle fand diese Funktion unter der Mandantenregel NIE ein Konto
+ * und warf „Kein Token gespeichert" — jeder Post fiel damit auf Handbetrieb
+ * zurück, und der Fehler sah aus, als läge er beim Creator.
  */
-export async function withFreshToken(accountId: string): Promise<string> {
-  const account = await loadAccount(accountId);
+export async function withFreshToken(db: DB, accountId: string): Promise<string> {
+  const account = await loadAccount(db, accountId);
   if (!account?.accessTokenEnc) {
     throw new TokenExpiredError("Kein Token gespeichert — Account neu verbinden");
   }
@@ -76,7 +81,7 @@ export async function withFreshToken(accountId: string): Promise<string> {
 
   return withLock(`lock:token:${accountId}`, LOCK_TTL_MS, async () => {
     // Unter dem Lock neu lesen — ein anderer Job kann schon refresht haben.
-    const fresh = await loadAccount(accountId);
+    const fresh = await loadAccount(db, accountId);
     if (!fresh?.accessTokenEnc) {
       throw new TokenExpiredError("Kein Token gespeichert — Account neu verbinden");
     }
@@ -87,7 +92,7 @@ export async function withFreshToken(accountId: string): Promise<string> {
       return decryptSecret(fresh.accessTokenEnc);
     }
     if (!fresh.refreshTokenEnc) {
-      await markExpired(accountId, "Kein Refresh-Token vorhanden");
+      await markExpired(db, accountId, "Kein Refresh-Token vorhanden");
       throw new TokenExpiredError("Kein Refresh-Token — Account neu verbinden");
     }
 
@@ -113,14 +118,14 @@ export async function withFreshToken(accountId: string): Promise<string> {
       return tokens.accessToken;
     } catch (error) {
       if (error instanceof TokenExpiredError) {
-        await markExpired(accountId, error.message);
+        await markExpired(db, accountId, error.message);
       }
       throw error;
     }
   });
 }
 
-async function markExpired(accountId: string, reason: string): Promise<void> {
+async function markExpired(db: DB, accountId: string, reason: string): Promise<void> {
   await db
     .update(socialAccounts)
     .set({ status: "expired", lastError: reason.slice(0, 300), updatedAt: new Date() })

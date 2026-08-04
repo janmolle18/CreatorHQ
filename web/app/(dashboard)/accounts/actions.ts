@@ -1,6 +1,6 @@
 "use server";
 
-import { db, socialAccounts } from "@creatorhq/db";
+import { socialAccounts } from "@creatorhq/db";
 import { isValidSlot, publishPlatformSchema } from "@creatorhq/shared";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";

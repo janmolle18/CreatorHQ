@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { db, clips } from "@creatorhq/db";
+import { clips, withTenant } from "@creatorhq/db";
+import { requireSession } from "@/lib/auth";
 import { desc, eq } from "drizzle-orm";
 import { AutoRefresh } from "@/components/auto-refresh";
 import {
@@ -23,11 +24,14 @@ function formatDuration(seconds: number | null): string {
 }
 
 export default async function ImportPage() {
-  const imported = await db
-    .select()
-    .from(clips)
-    .where(eq(clips.origin, "imported"))
-    .orderBy(desc(clips.createdAt));
+  const session = await requireSession();
+  const imported = await withTenant(session.tenantId, (db) =>
+    db
+      .select()
+      .from(clips)
+      .where(eq(clips.origin, "imported"))
+      .orderBy(desc(clips.createdAt))
+  );
 
   return (
     <>

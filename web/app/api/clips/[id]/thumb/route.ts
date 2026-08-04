@@ -1,4 +1,4 @@
-import { db, clips } from "@creatorhq/db";
+import { clips, withTenant } from "@creatorhq/db";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { presignGet } from "@/lib/storage";
@@ -10,17 +10,25 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await getSession())) {
+  const session = await getSession();
+  if (!session) {
     return new Response("Nicht angemeldet", { status: 401 });
   }
 
+  // Wie bei der Video-Route: Die Mandantengrenze IST die Zugriffsprüfung.
   const { id } = await params;
-  const [clip] = await db.select().from(clips).where(eq(clips.id, id));
-  if (!clip?.thumbPath) {
+  const thumbPath = await withTenant(session.tenantId, async (db) => {
+    const [clip] = await db
+      .select({ thumbPath: clips.thumbPath })
+      .from(clips)
+      .where(eq(clips.id, id));
+    return clip?.thumbPath ?? null;
+  });
+  if (!thumbPath) {
     return new Response("Kein Vorschaubild", { status: 404 });
   }
 
-  const url = await presignGet(clip.thumbPath);
+  const url = await presignGet(thumbPath);
   let upstream: Response;
   try {
     upstream = await fetch(url);

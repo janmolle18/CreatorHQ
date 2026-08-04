@@ -1,11 +1,11 @@
 "use server";
 
-import { db, clips, posts, socialAccounts } from "@creatorhq/db";
+import { clips, posts, socialAccounts, type TenantDB } from "@creatorhq/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireSession } from "@/lib/auth";
+import { mitMandant, requireSession } from "@/lib/auth";
 import { maintenanceQueue, publishQueue } from "@/lib/queues";
 
 /** Zustände, in denen ein Post noch nicht draußen ist (neu planbar/pushbar). */
@@ -41,7 +41,7 @@ const urlSchema = z
  * Ohne Verbindung wäre ein „Jetzt posten" eine Lüge: der Worker fiele sofort
  * auf „Du bist dran" zurück, hätte aber den geplanten Termin schon überschrieben.
  */
-async function connectedPlatforms(): Promise<Set<string>> {
+async function connectedPlatforms(db: TenantDB): Promise<Set<string>> {
   const accounts = await db
     .select({ platform: socialAccounts.platform, status: socialAccounts.status })
     .from(socialAccounts)
@@ -51,33 +51,39 @@ async function connectedPlatforms(): Promise<Set<string>> {
 
 /**
  * Einen Post SOFORT veröffentlichen lassen: Zeit auf jetzt, Publish-Job einreihen.
- * Nur mit verbundenem Account — sonst bleibt der Termin unangetastet und David
- * bekommt gesagt, dass er selbst posten muss.
+ * Nur mit verbundenem Account — sonst bleibt der Termin unangetastet und der
+ * Creator bekommt gesagt, dass er selbst posten muss.
  */
 export async function pushNowAction(formData: FormData): Promise<void> {
-  await requireSession();
   const postId = String(formData.get("postId") ?? "");
   if (!postId) return;
 
-  const [post] = await db.select().from(posts).where(eq(posts.id, postId));
-  if (!post || !nochNirgends(post)) {
+  // Umleitungen stehen NACH dem Block — innerhalb der Transaktion würden sie
+  // die gerade geschriebene Terminänderung zurücknehmen.
+  const { lage, tenantId } = await mitMandant(async (db, session) => {
+    const [post] = await db.select().from(posts).where(eq(posts.id, postId));
+    if (!post || !nochNirgends(post)) return { lage: "draussen" as const, tenantId: session.tenantId };
+
+    const connected = await connectedPlatforms(db);
+    if (!connected.has(post.platform)) return { lage: "manuell" as const, tenantId: session.tenantId };
+
+    await db
+      .update(posts)
+      .set({ scheduledAt: new Date(), status: "scheduled", error: null, updatedAt: new Date() })
+      .where(eq(posts.id, postId));
+    return { lage: "los" as const, tenantId: session.tenantId };
+  });
+
+  if (lage === "draussen") {
     redirect("/posts?error=" + encodeURIComponent("Dieser Post ist schon draußen"));
   }
+  if (lage === "manuell") redirect("/posts?manual=1");
 
-  const connected = await connectedPlatforms();
-  if (!connected.has(post!.platform)) {
-    redirect("/posts?manual=1");
-  }
-
-  await db
-    .update(posts)
-    .set({ scheduledAt: new Date(), status: "scheduled", error: null, updatedAt: new Date() })
-    .where(eq(posts.id, postId));
   // manual: true — dieser Klick ist eine bewusste Handlung und läuft auch,
   // wenn das automatische Posten ausgeschaltet ist.
   await publishQueue().add(
     "publish",
-    { postId, manual: true },
+    { tenantId, postId, manual: true },
     { jobId: `publish-now-${postId}-${Date.now()}` }
   );
 
@@ -87,43 +93,46 @@ export async function pushNowAction(formData: FormData): Promise<void> {
 
 /** Alle offenen Posts eines Videos auf einmal veröffentlichen lassen. */
 export async function pushClipNowAction(formData: FormData): Promise<void> {
-  await requireSession();
   const clipId = String(formData.get("clipId") ?? "");
   if (!clipId) return;
 
-  const connected = await connectedPlatforms();
-  const pending = await db
-    .select({
-      id: posts.id,
-      platform: posts.platform,
-      status: posts.status,
-      externalPostId: posts.externalPostId,
-    })
-    .from(posts)
-    .where(and(eq(posts.clipId, clipId), inArray(posts.status, [...PENDING_STATES])));
-  const pushable = pending
-    .filter(nochNirgends)
-    .filter((post) => connected.has(post.platform));
+  const { ids, tenantId } = await mitMandant(async (db, session) => {
+    const connected = await connectedPlatforms(db);
+    const pending = await db
+      .select({
+        id: posts.id,
+        platform: posts.platform,
+        status: posts.status,
+        externalPostId: posts.externalPostId,
+      })
+      .from(posts)
+      .where(and(eq(posts.clipId, clipId), inArray(posts.status, [...PENDING_STATES])));
+    const pushable = pending
+      .filter(nochNirgends)
+      .filter((post) => connected.has(post.platform));
 
-  if (pushable.length === 0) {
-    redirect("/posts?manual=1");
-  }
+    const now = new Date();
+    for (const post of pushable) {
+      await db
+        .update(posts)
+        .set({ scheduledAt: now, status: "scheduled", error: null, updatedAt: now })
+        .where(eq(posts.id, post.id));
+    }
+    return { ids: pushable.map((post) => post.id), tenantId: session.tenantId };
+  });
 
-  const now = new Date();
-  for (const post of pushable) {
-    await db
-      .update(posts)
-      .set({ scheduledAt: now, status: "scheduled", error: null, updatedAt: now })
-      .where(eq(posts.id, post.id));
+  if (ids.length === 0) redirect("/posts?manual=1");
+
+  for (const postId of ids) {
     await publishQueue().add(
       "publish",
-      { postId: post.id, manual: true },
-      { jobId: `publish-now-${post.id}-${Date.now()}` }
+      { tenantId, postId, manual: true },
+      { jobId: `publish-now-${postId}-${Date.now()}` }
     );
   }
 
   revalidatePath("/posts");
-  redirect("/posts?pushed=" + pushable.length);
+  redirect("/posts?pushed=" + ids.length);
 }
 
 /**
@@ -132,39 +141,46 @@ export async function pushClipNowAction(formData: FormData): Promise<void> {
  * Ein-Video-ein-Zeitpunkt-Logik frisch ein. Live-Posts bleiben unberührt.
  */
 export async function rebuildScheduleAction(): Promise<void> {
-  await requireSession();
+  const { clipIds, tenantId } = await mitMandant(async (db, session) => {
+    // Posts mit Plattform-ID bleiben stehen: Ein privat hochgeladenes
+    // YouTube-Video würde sonst samt Studio-Link gelöscht und danach ein
+    // zweites Mal hochgeladen.
+    const pending = (
+      await db
+        .select({
+          id: posts.id,
+          clipId: posts.clipId,
+          status: posts.status,
+          externalPostId: posts.externalPostId,
+        })
+        .from(posts)
+        .where(inArray(posts.status, [...PENDING_STATES]))
+    ).filter(nochNirgends);
+    const ids = [...new Set(pending.map((post) => post.clipId))];
 
-  // Posts mit Plattform-ID bleiben stehen: Ein privat hochgeladenes
-  // YouTube-Video würde sonst samt Studio-Link gelöscht und danach ein
-  // zweites Mal hochgeladen.
-  const pending = (
-    await db
-      .select({
-        id: posts.id,
-        clipId: posts.clipId,
-        status: posts.status,
-        externalPostId: posts.externalPostId,
-      })
-      .from(posts)
-      .where(inArray(posts.status, [...PENDING_STATES]))
-  ).filter(nochNirgends);
-  const clipIds = [...new Set(pending.map((post) => post.clipId))];
-
-  if (pending.length > 0) {
-    await db.delete(posts).where(inArray(posts.id, pending.map((post) => post.id)));
-  }
-  if (clipIds.length > 0) {
-    await db
-      .update(clips)
-      .set({ status: "rendered", updatedAt: new Date() })
-      .where(and(inArray(clips.id, clipIds), eq(clips.status, "scheduled")));
-    for (const clipId of clipIds) {
-      await maintenanceQueue().add(
-        "schedule",
-        { clipId },
-        { jobId: `schedule-rebuild-${clipId}-${Date.now()}` }
+    if (pending.length > 0) {
+      await db.delete(posts).where(
+        inArray(
+          posts.id,
+          pending.map((post) => post.id)
+        )
       );
     }
+    if (ids.length > 0) {
+      await db
+        .update(clips)
+        .set({ status: "rendered", updatedAt: new Date() })
+        .where(and(inArray(clips.id, ids), eq(clips.status, "scheduled")));
+    }
+    return { clipIds: ids, tenantId: session.tenantId };
+  });
+
+  for (const clipId of clipIds) {
+    await maintenanceQueue().add(
+      "schedule",
+      { tenantId, clipId },
+      { jobId: `schedule-rebuild-${clipId}-${Date.now()}` }
+    );
   }
 
   revalidatePath("/posts");
@@ -173,7 +189,6 @@ export async function rebuildScheduleAction(): Promise<void> {
 
 /** Manual-Fallback abschließen: Post wurde von Hand veröffentlicht. */
 export async function markPublishedAction(formData: FormData): Promise<void> {
-  await requireSession();
   const postId = String(formData.get("postId") ?? "");
   if (!postId) return;
 
@@ -184,16 +199,18 @@ export async function markPublishedAction(formData: FormData): Promise<void> {
     );
   }
 
-  await db
-    .update(posts)
-    .set({
-      status: "published",
-      postedAt: new Date(),
-      externalUrl: parsedUrl.data || null,
-      error: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(posts.id, postId));
+  await mitMandant((db) =>
+    db
+      .update(posts)
+      .set({
+        status: "published",
+        postedAt: new Date(),
+        externalUrl: parsedUrl.data || null,
+        error: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(posts.id, postId))
+  );
 
   revalidatePath("/posts");
   redirect("/posts?done=1");

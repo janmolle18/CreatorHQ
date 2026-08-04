@@ -1,4 +1,4 @@
-import { db, sourceVideos, type SourceTranscript, type SourceVideo } from "@creatorhq/db";
+import { sourceVideos, type SourceTranscript, type SourceVideo } from "@creatorhq/db";
 import { eq } from "drizzle-orm";
 import { execa } from "execa";
 import path from "node:path";
@@ -62,7 +62,7 @@ export class SmartClipProvider implements ClipProvider {
   }
 
   private async findClipsFromTranscript(req: ClipRequest): Promise<ClipCandidate[]> {
-    const [video] = await db
+    const [video] = await req.db
       .select()
       .from(sourceVideos)
       .where(eq(sourceVideos.id, req.sourceVideoId));
@@ -150,7 +150,7 @@ export class SmartClipProvider implements ClipProvider {
         segments: result.segments,
       };
       try {
-        await db
+        await req.db
           .update(sourceVideos)
           .set({ transcriptJson: transcript, updatedAt: new Date() })
           .where(eq(sourceVideos.id, req.sourceVideoId));

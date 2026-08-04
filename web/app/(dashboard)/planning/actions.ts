@@ -1,6 +1,6 @@
 "use server";
 
-import { calendarItems, db, ideas, settings } from "@creatorhq/db";
+import { calendarItems, ideas, settings } from "@creatorhq/db";
 import {
   DEFAULT_TIMEZONE,
   isValidSlot,

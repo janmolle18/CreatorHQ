@@ -199,7 +199,7 @@ export async function syncInstagramComments(db: DB, tenantId: string): Promise<n
     .where(eq(socialAccounts.platform, "instagram"));
   if (account?.status !== "connected") return 0;
 
-  const token = await withFreshToken(account.id);
+  const token = await withFreshToken(db, account.id);
   const published = await db
     .select({ id: posts.id, externalPostId: posts.externalPostId })
     .from(posts)

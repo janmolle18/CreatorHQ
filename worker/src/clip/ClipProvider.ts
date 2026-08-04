@@ -1,3 +1,5 @@
+import type { DB } from "@creatorhq/db";
+
 /**
  * Austauschbare Clipping-Engine (aus ClipPilot; clipsai/vizard bewusst nicht übernommen).
  *
@@ -20,6 +22,15 @@ export interface ClipCandidate {
 }
 
 export interface ClipRequest {
+  /**
+   * Mandantengebundenes Datenbank-Handle.
+   *
+   * Der Provider liest das Quellvideo und legt das Transkript ab. Mit dem
+   * globalen Handle faende er unter der Mandantenregel nichts und fiele
+   * stillschweigend auf die Lautstaerke-Heuristik zurueck — die Clips waeren
+   * merklich schlechter, ohne dass irgendwo ein Fehler auftaucht.
+   */
+  db: DB;
   /** Lokaler Pfad zur heruntergeladenen Quell-Videodatei */
   sourceFilePath: string;
   sourceVideoId: string;

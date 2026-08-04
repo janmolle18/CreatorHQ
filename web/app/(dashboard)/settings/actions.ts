@@ -1,6 +1,6 @@
 "use server";
 
-import { db, settings } from "@creatorhq/db";
+import { settings } from "@creatorhq/db";
 import { isValidTimezone, publishTargetsSchema } from "@creatorhq/shared";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
