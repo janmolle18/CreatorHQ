@@ -3,6 +3,8 @@ import { PLATFORM_LABELS, PUBLISH_PLATFORMS, type PublishPlatform } from "@creat
 import { mitMandant } from "@/lib/auth";
 import { plattformBereitschaft } from "@/lib/platform-status";
 import { Card, PageHeader, StatusText, buttonClasses } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { pruefeVerbindungAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,9 +37,18 @@ const LAGE_TEXT: Record<Lage, { label: string; tone: "ok" | "warn" | "err" | "mu
 export default async function VerbindenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ connected?: string; error?: string }>;
+  searchParams: Promise<{
+    connected?: string;
+    error?: string;
+    geprueft?: string;
+    bereit?: string;
+    befund?: string;
+    konto?: string;
+    tun?: string;
+  }>;
 }) {
-  const { connected, error } = await searchParams;
+  const { connected, error, geprueft, bereit, befund, konto: geprueftesKonto, tun } =
+    await searchParams;
 
   const konten = await mitMandant((tx) => tx.select().from(socialAccounts));
   const proPlattform = new Map(konten.map((konto) => [konto.platform, konto]));
@@ -115,6 +126,40 @@ export default async function VerbindenPage({
                       Nur nötig, wenn etwas klemmt — verbunden bleibt verbunden.
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* „Verbunden" sagt nur, dass irgendwann ein Token ankam. Ob damit
+                  auch ein Video durchgeht, weiss man sonst erst, wenn das erste
+                  rausgehen soll — also genau dann, wenn es weh tut. */}
+              {lage === "verbunden" && (
+                <form action={pruefeVerbindungAction} className="mt-4">
+                  <input type="hidden" name="platform" value={platform} />
+                  <SubmitButton variant="ghost" pendingLabel="Frage nach …">
+                    Kann hochgeladen werden?
+                  </SubmitButton>
+                </form>
+              )}
+
+              {geprueft === platform && befund && (
+                <div
+                  className={`mt-4 max-w-xl rounded-lg border px-4 py-3 ${
+                    bereit === "1" ? "border-ok/40 bg-ok/[0.07]" : "border-warn/40 bg-warn/[0.07]"
+                  }`}
+                >
+                  <p className="text-meta">
+                    <StatusText tone={bereit === "1" ? "ok" : "warn"}>
+                      {bereit === "1" ? "Geht" : "Geht noch nicht"}
+                    </StatusText>{" "}
+                    <span className="text-ink">{befund}</span>
+                  </p>
+                  {geprueftesKonto && (
+                    <p className="mt-1 text-xs text-ink-soft">
+                      Antwortet als <strong className="font-medium text-ink">{geprueftesKonto}</strong>{" "}
+                      — stimmt das nicht, oben neu verbinden und das richtige Konto wählen.
+                    </p>
+                  )}
+                  {tun && <p className="mt-1 text-xs text-ink-soft">{tun}</p>}
                 </div>
               )}
             </div>

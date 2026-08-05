@@ -24,6 +24,7 @@ import {
 } from "@/components/ui";
 import { DEFAULT_TIMEZONE, formatInTz, YOUTUBE_UPLOADS_PRO_TAG } from "@creatorhq/shared";
 import { checkInfra, queueDepths } from "@/lib/infra";
+import { pruefeEinrichtung, verbindenMoeglich } from "@/lib/einrichtung-pruefen";
 import {
   backupInfo,
   formatAlter,
@@ -58,6 +59,8 @@ function Zeile({ label, children }: { label: string; children: React.ReactNode }
 
 export default async function SystemPage() {
   const session = await requireSession();
+  const einrichtung = pruefeEinrichtung();
+  const moeglich = verbindenMoeglich(einrichtung);
 
   // Betriebsdaten (Container, Warteschlangen, Speicher) sind plattformweit und
   // brauchen keine Mandantengrenze; die Datenbankabfragen darunter schon.
@@ -236,6 +239,55 @@ export default async function SystemPage() {
             </p>
           )}
         </Card>
+      </section>
+
+      {/* Plattform-Zugänge: der einzige Grund, warum die Verbinden-Seite bei
+          einem neuen Creator leer bleibt. Steht hier und nicht dort, weil der
+          Creator daran nichts ändern kann — das ist Betreiber-Technik. */}
+      <section className="mb-14">
+        <SectionTitle>Plattform-Zugänge</SectionTitle>
+        <p className="mb-4 max-w-2xl text-meta text-ink-soft">
+          {moeglich.length === 0
+            ? "Aktuell kann sich niemand verbinden — die Verbinden-Seite zeigt dann bewusst gar keinen Knopf statt eines, der in einer Fehlermeldung endet."
+            : `Verbinden möglich für: ${moeglich.join(", ")}.`}
+        </p>
+        <Table head={["Plattform", "Schlüssel", "Rückleitung", "Was zu tun ist"]} cards>
+          {einrichtung.map((eintrag) => (
+            <tr key={eintrag.platform}>
+              <Td label="Plattform" className="font-medium">
+                {eintrag.platform}
+              </Td>
+              <Td label="Schlüssel">
+                <StatusText tone={eintrag.schluessel === "passt" ? "ok" : "warn"}>
+                  {eintrag.schluessel === "passt" ? "hinterlegt" : "fehlt"}
+                </StatusText>
+              </Td>
+              <Td label="Rückleitung">
+                <StatusText
+                  tone={
+                    eintrag.rueckleitung === "passt"
+                      ? "ok"
+                      : eintrag.rueckleitung === "abweichend"
+                        ? "err"
+                        : "warn"
+                  }
+                >
+                  {eintrag.rueckleitung}
+                </StatusText>
+                {eintrag.rueckleitung === "abweichend" && (
+                  <span className="mt-1 block break-all text-xs text-ink-faint">
+                    eingetragen: {eintrag.eingetragen || "—"}
+                    <br />
+                    erwartet: {eintrag.erwartet}
+                  </span>
+                )}
+              </Td>
+              <Td label="Was zu tun ist" className="max-w-md">
+                <span className="text-xs text-ink-soft">{eintrag.hinweis}</span>
+              </Td>
+            </tr>
+          ))}
+        </Table>
       </section>
 
       <section className="mb-14">
