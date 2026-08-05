@@ -166,7 +166,7 @@ export function buttonClasses(variant: ButtonVariant = "primary", extra = ""): s
       ? "bg-ink text-paper hover:bg-white"
       : variant === "danger"
         ? "border border-err/40 text-err hover:border-err hover:bg-err/[0.08]"
-        : "bg-raised text-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.06)] hover:bg-raised/70";
+        : "border border-feldrand bg-raised text-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.06)] hover:bg-hairline hover:border-ink-faint";
   // `knopf` bringt das Verhalten mit (Heben, Glanz, Druckpunkt, Laufbalken) —
   // siehe globals.css. Hier stehen nur noch Maße und Farbe.
   return `knopf inline-flex min-h-11 select-none items-center justify-center rounded-lg px-4 text-meta font-medium tracking-wide disabled:cursor-not-allowed disabled:opacity-40 ${styles} ${extra}`;
@@ -245,11 +245,21 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 // Auf dunklem Grund reicht ein Unterstrich nicht: Das Feld braucht eine eigene
 // Fläche, sonst ist nicht erkennbar, wo man hineinschreiben kann.
 //
+// Der Rahmen ist --color-feldrand und NICHT hairline: hairline ist eine
+// Trennlinie und kommt gegen paper auf 1,36:1 — die Norm verlangt fuer die
+// Grenze eines Bedienelements 3:1. Mit hairline war das Feld vom Seitengrund
+// praktisch nicht zu unterscheiden.
+//
+// `focus:outline-none` ist bewusst NICHT mehr da: Es lag in Tailwinds
+// utilities-Layer und schlug damit die globale Fokusregel aus @layer base —
+// der Akzent-Ring war an jedem Feld weg. Der weiche Schein bleibt als
+// Zugabe, tragen muss ihn die Outline.
+//
 // Beim Hineinschreiben legt sich ein Akzent-Ring um das Feld. Das ist bewusst
 // ein `box-shadow` und keine `border`: Eine wachsende Rahmenbreite würde das
 // Feld um zwei Pixel verschieben und die ganze Zeile neu umbrechen lassen.
 const FIELD_BASE =
-  "w-full rounded-lg border border-hairline bg-panel px-3 py-2.5 text-[15px] text-ink shadow-[0_0_0_0_rgb(124_92_255/0)] transition-[border-color,box-shadow] duration-200 placeholder:text-ink-faint hover:border-ink-faint/60 focus:border-accent focus:shadow-[0_0_0_3px_rgb(124_92_255/0.18)] focus:outline-none";
+  "w-full rounded-lg border border-feldrand bg-panel px-3 py-2.5 text-[15px] text-ink shadow-[0_0_0_0_rgb(124_92_255/0)] transition-[border-color,box-shadow] duration-200 placeholder:text-ink-faint hover:border-ink-faint focus:border-accent focus:shadow-[0_0_0_3px_rgb(124_92_255/0.18)]";
 
 export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`${FIELD_BASE} ${className}`} {...props} />;

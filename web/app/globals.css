@@ -26,6 +26,12 @@
   --color-raised: #1f1f26;
   --color-hairline: #2a2a33;
 
+  /* Grenze von BEDIENELEMENTEN — nicht zu verwechseln mit --color-hairline,
+     das eine reine Trennlinie ist. WCAG 2.2 verlangt fuer die Grenze eines
+     Bedienelements 3:1; hairline (#2a2a33) kommt gegen paper nur auf 1,36:1.
+     Nachgerechnet: #66666f = 3,39:1 gegen paper, 3,14:1 gegen panel. */
+  --color-feldrand: #66666f;
+
   /* Schrift. Die Kontraste sind gegen --color-paper gerechnet:
      ink 16:1 · ink-soft 9,3:1 · ink-faint 5,6:1 — alle über der Norm.
      Der Vorgänger hatte hier schon einmal 2,5:1 stehen; das passiert
@@ -113,9 +119,12 @@
     line-height: 1.12;
   }
 
+  /* Markierter Text: paper auf accent = 4,43:1. Mit ink waeren es 3,87:1 —
+     also genau der Kontrast, mit dem oben begruendet wird, warum der
+     Hauptknopf NICHT violett ist. */
   ::selection {
     background-color: var(--color-accent);
-    color: var(--color-ink);
+    color: var(--color-paper);
   }
 
   /* Ein sichtbarer Fokus für die Tastaturbedienung — global, damit keine
@@ -161,10 +170,10 @@
    Die gemeinsame Grundlage aller Knopf-Varianten. Farben setzt buttonClasses()
    in web/components/ui.tsx; hier steht nur, wie sich ein Knopf ANFÜHLT.
 
-   Warum das in CSS steht und nicht in Utility-Klassen: Der Glanz und das
-   Leuchten sind Pseudo-Elemente. Sie werden über `opacity` ein- und
-   ausgeblendet, nicht über `box-shadow` oder `background-position` — nur
-   `opacity` und `transform` laufen im Compositor und kosten kein Neuzeichnen.
+   Warum das in CSS steht und nicht in Utility-Klassen: Der Glanz ist ein
+   Pseudo-Element und wird über `transform` durchgeschoben, nicht über
+   `background-position` — nur `opacity` und `transform` laufen im Compositor
+   und kosten kein Neuzeichnen.
 
    Die drei Zustände sind bewusst unterscheidbar, nicht nur schattiert:
      ruhend  → liegt auf der Fläche
@@ -180,17 +189,14 @@
     color var(--zeit-fast) linear;
 }
 
-/* Das Leuchten unter dem Knopf — nur beim Zeigen sichtbar. */
-.knopf::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  opacity: 0;
-  transition: opacity var(--zeit-normal) var(--kurve);
-  box-shadow: var(--schatten-hoch);
-}
+/* Hier stand ein Pseudo-Element, das beim Zeigen ein Leuchten UNTER den Knopf
+   legen sollte. Es war nie zu sehen: `overflow: hidden` auf .knopf schneidet
+   genau den Bereich weg, in dem ein aeusserer Schatten gezeichnet wird — und
+   der Clip ist noetig, damit das Lichtband am Rand endet. Uebrig blieb eine
+   220-ms-Transition ohne jede Wirkung an jedem Knopf der Anwendung.
+   Ersatzlos gestrichen: Heben, Lichtband und Farbwechsel tragen den Zustand.
+   Gemessen wurde damals nur die `opacity` des Pseudo-Elements — die aenderte
+   sich brav, sichtbar war davon nichts. */
 
 /* Der Glanz: ein schräges Lichtband, das einmal durchwandert. Es liegt außen
    und wird bei Hover quer über die Fläche geschoben — reine Transform-Animation. */
@@ -214,10 +220,6 @@
 
 .knopf:hover:not(:disabled) {
   transform: translateY(-1px);
-}
-
-.knopf:hover:not(:disabled)::before {
-  opacity: 1;
 }
 
 .knopf:hover:not(:disabled)::after {
@@ -346,6 +348,16 @@
    1 px springt statt zu gleiten, ist für genau die Menschen schlimmer, die
    diese Einstellung gesetzt haben. Deshalb werden die Verschiebungen selbst
    zurückgenommen und die Zustände stattdessen über Helligkeit angezeigt. */
+/* Im erzwungenen Farbmodus (Windows-Kontrastmodus) setzt das System
+   `box-shadow` auf none und ueberschreibt Rahmenfarben — der Fokus waere dann
+   unsichtbar. `outline` ueberlebt dort als Einziges. */
+@media (forced-colors: active) {
+  :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid ButtonText;
+    outline-offset: 2px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

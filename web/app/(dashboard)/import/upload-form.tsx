@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { Button, StatusText } from "@/components/ui";
+import { Button, StatusText, buttonClasses } from "@/components/ui";
 
 interface UploadState {
   busy: boolean;
@@ -55,14 +55,25 @@ export function UploadForm() {
 
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <label className="cursor-pointer border border-hairline px-4 py-2 text-[13px] font-medium tracking-wide transition-colors hover:border-ink-faint">
+      {/* Die Dateiwahl war per Tastatur GAR NICHT erreichbar: `hidden` erzeugt
+          display:none, und was nicht dargestellt wird, bekommt auch keinen
+          Fokus. Das Etikett war kein Knopf und hatte keinen tabindex — damit
+          war der ganze Import nur mit der Maus bedienbar.
+          `sr-only` versteckt die Eingabe sichtbar, laesst sie aber im
+          Fokuslauf; `focus-within` zeigt am Etikett, dass sie dran ist. */}
+      <label
+        className={buttonClasses(
+          "ghost",
+          "cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent"
+        )}
+      >
         Dateien auswählen
         <input
           ref={inputRef}
           type="file"
           accept="video/mp4,.mp4"
           multiple
-          className="hidden"
+          className="sr-only"
           onChange={(event) => setSelectedCount(event.target.files?.length ?? 0)}
         />
       </label>

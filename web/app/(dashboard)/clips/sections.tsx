@@ -7,7 +7,7 @@ import {
   PUBLISH_PLATFORMS,
   type PublishPlatform,
 } from "@creatorhq/shared";
-import { Button, Field, Input, StatusText } from "@/components/ui";
+import { Button, Field, Input, StatusText, Textarea } from "@/components/ui";
 import { CLIP_STATUS, POST_STATUS } from "@/lib/status";
 import { ConfirmButton } from "@/components/confirm-button";
 import {
@@ -322,11 +322,10 @@ export function ProductionSection({
                 />
               </Field>
               <Field label="Caption">
-                <textarea
+                <Textarea
                   name="caption"
                   defaultValue={clip.caption ?? ""}
                   rows={3}
-                  className="w-full border-0 border-b border-hairline bg-transparent py-2 text-[15px] placeholder:text-ink-faint focus:border-accent focus:shadow-[0_0_0_3px_rgb(124_92_255/0.18)] focus:outline-none"
                   placeholder="Caption für TikTok/Reels/Shorts"
                 />
               </Field>
