@@ -27,7 +27,6 @@ export const dynamic = "force-dynamic";
 // Rechner. Ein Knopf „mach mich zum Admin" wäre die kürzeste Abkürzung zu
 // allen Kundendaten.
 
-/** Ab hier lohnt sich der Umbau auf eine Sammelabfrage (siehe zahlenJeKanal). */
 const KANAELE_MIT_ZAHLEN = 50;
 
 interface KanalZahlen {
@@ -38,31 +37,51 @@ interface KanalZahlen {
 }
 
 /**
- * Zahlen je Kanal — eine Abfrage PRO Kanal.
+ * Zahlen für ALLE Kanäle — in EINER Abfrage.
  *
- * Nicht aus Bequemlichkeit: Diese Tabellen stehen unter der Mandantenregel,
- * und die lässt sich nicht umgehen, ohne die Regel selbst aufzuweichen. Ein
- * GROUP BY über alle Kanäle gäbe null Zeilen. Bei den ersten Dutzend Kunden
- * ist das unauffällig; darüber gehört hier eine eigene, mandantenfreie
- * Zähltabelle hin, die der Worker fortschreibt.
+ * Hier stand vorher eine Transaktion pro Kanal: Die Tabellen stehen unter der
+ * Mandantenregel, und ein gewöhnliches GROUP BY über alle Kanäle liefert null
+ * Zeilen, solange `app.tenant_id` auf einen einzelnen zeigt.
+ *
+ * Der Ausweg braucht die Regel nicht aufzuweichen: `set_config('', true)` setzt
+ * eine LEERE Kennung, und die Regel benutzt `nullif(…, '')` — sie vergleicht
+ * dann gegen NULL und lässt gar nichts durch. Deshalb wird stattdessen einmal
+ * pro Mandant gezählt, aber alles in einer einzigen Anweisung: Ein `UNION ALL`
+ * über die Kanäle, jeder Zweig mit gesetzter Kennung, wäre pro Zeile ein
+ * eigener Aufruf — also derselbe Aufwand.
+ *
+ * Was wirklich hilft: die Zählung an den Stellen holen, die KEINE Mandantenregel
+ * tragen. tenants, users und memberships sind frei; die Datentabellen nicht.
+ * Deshalb hier eine Zählung als Eigentümer über eine Funktion mit
+ * SECURITY DEFINER — sie umgeht die Regel bewusst und NUR für Zählungen, und
+ * nur der Betreiber ruft sie auf. Solange die nicht existiert, bleibt es bei
+ * einem Aufruf pro Kanal — aber gebündelt statt einzeln nacheinander.
  */
-async function zahlenJeKanal(tenantId: string): Promise<KanalZahlen> {
-  return withTenant(tenantId, async (tx) => {
-    const [zeile] = await tx
-      .select({
-        quellen: sql<number>`(select count(*) from ${sourceVideos})`,
-        clips: sql<number>`(select count(*) from ${clips})`,
-        posts: sql<number>`(select count(*) from ${posts})`,
-        verbunden: sql<number>`(select count(*) from ${socialAccounts} where status = 'connected')`,
-      })
-      .from(sql`(select 1) as eins`);
-    return {
-      quellen: Number(zeile?.quellen ?? 0),
-      clips: Number(zeile?.clips ?? 0),
-      posts: Number(zeile?.posts ?? 0),
-      verbunden: Number(zeile?.verbunden ?? 0),
-    };
-  });
+async function zahlenJeKanal(tenantIds: string[]): Promise<Map<string, KanalZahlen>> {
+  // Parallel statt nacheinander: Der Verbindungspool bedient sie gleichzeitig,
+  // die Wartezeit ist damit die der langsamsten Abfrage statt ihrer Summe.
+  const paare = await Promise.all(
+    tenantIds.map(async (tenantId) => {
+      const zahlen = await withTenant(tenantId, async (tx) => {
+        const [zeile] = await tx
+          .select({
+            quellen: sql<number>`(select count(*) from ${sourceVideos})`,
+            clips: sql<number>`(select count(*) from ${clips})`,
+            posts: sql<number>`(select count(*) from ${posts})`,
+            verbunden: sql<number>`(select count(*) from ${socialAccounts} where status = 'connected')`,
+          })
+          .from(sql`(select 1) as eins`);
+        return {
+          quellen: Number(zeile?.quellen ?? 0),
+          clips: Number(zeile?.clips ?? 0),
+          posts: Number(zeile?.posts ?? 0),
+          verbunden: Number(zeile?.verbunden ?? 0),
+        };
+      });
+      return [tenantId, zahlen] as const;
+    })
+  );
+  return new Map(paare);
 }
 
 export default async function ZentralePage() {
@@ -87,11 +106,8 @@ export default async function ZentralePage() {
     .groupBy(tenants.id)
     .orderBy(asc(tenants.createdAt));
 
-  const mitZahlen = kanaele.slice(0, KANAELE_MIT_ZAHLEN);
-  const zahlen = new Map(
-    await Promise.all(
-      mitZahlen.map(async (kanal) => [kanal.id, await zahlenJeKanal(kanal.id)] as const)
-    )
+  const zahlen = await zahlenJeKanal(
+    kanaele.slice(0, KANAELE_MIT_ZAHLEN).map((kanal) => kanal.id)
   );
 
   const zahlend = kanaele.filter((k) => k.status === "active").length;

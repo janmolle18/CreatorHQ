@@ -41,8 +41,25 @@ const nextConfig = {
   outputFileTracingRoot: new URL("..", import.meta.url).pathname,
   // Workspace-Pakete (TS-Quelle) transpilieren
   transpilePackages: ["@creatorhq/db", "@creatorhq/shared"],
-  // Native/Server-only Pakete nicht bundeln
-  serverExternalPackages: ["postgres"],
+  /**
+   * Server-only Pakete NICHT bündeln, sondern zur Laufzeit laden.
+   *
+   * Diese Bibliotheken laufen ausschließlich auf dem Server. Sie zu bündeln
+   * bringt keinen Vorteil, kostet aber bei JEDEM Übersetzen: Webpack muss ihre
+   * kompletten Abhängigkeitsbäume auflösen — bei BullMQ inklusive der
+   * OPTIONALEN Abhängigkeit `@valkey/valkey-glide`, die gar nicht installiert
+   * ist. Diese eine Auflösung scheiterte bei jedem einzelnen Neuübersetzen
+   * einer Seite und wurde im Protokoll als Warnung wiederholt.
+   *
+   * BullMQ hängt über fünf actions.ts an fünf Seiten; das AWS-SDK am Upload.
+   */
+  serverExternalPackages: [
+    "postgres",
+    "bullmq",
+    "ioredis",
+    "@aws-sdk/client-s3",
+    "@aws-sdk/s3-request-presigner",
+  ],
   experimental: {
     serverActions: {
       allowedOrigins: allowedOrigins(),

@@ -12,6 +12,7 @@ import { and, eq } from "drizzle-orm";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 // Signierte HttpOnly-Sitzungen (jose). Der Keks trägt, WER angemeldet ist und
 // FÜR WEN gearbeitet wird — beides wird bei jeder Anfrage gegen die Datenbank
@@ -79,8 +80,15 @@ export async function destroySession(): Promise<void> {
  * geglaubt. Ohne das behielte ein entferntes Teammitglied bis zu 30 Tage
  * Zugriff — so lange gilt der Keks. Eine Abfrage auf einem eindeutigen Index
  * ist der Preis dafür, und der ist niedrig.
+ *
+ * `cache()` von React fasst diese Abfrage INNERHALB EINER ANFRAGE zusammen.
+ * Das ist kein Zwischenspeicher über Anfragen hinweg — die Prüfung oben bleibt
+ * bei jeder Anfrage frisch. Es entfernt nur die Doppelung: Das Layout ruft
+ * requireSession() für Menü und Kanalnamen, die Seite ruft mitMandant(), das
+ * sie erneut aufruft. Ohne cache() waren das bei JEDEM Seitenaufruf zwei
+ * identische Abfragen; Seiten mit eigener Rechteprüfung kamen auf drei.
  */
-export async function getSession(): Promise<Session | null> {
+export const getSession = cache(async function getSession(): Promise<Session | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -146,7 +154,7 @@ export async function getSession(): Promise<Session | null> {
     emailVerified: zeile.emailVerifiedAt !== null,
     alsAdminImFremdenKanal,
   };
-}
+});
 
 /** Guard für die Betreiber-Zentrale. */
 export async function requirePlatformAdmin(): Promise<Session> {
