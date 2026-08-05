@@ -75,6 +75,34 @@ describe("plattformBereitschaft", () => {
     }
   });
 
+  it("der Knopf haengt an den SCHLUESSELN, nicht an der Freigabe — alle drei", () => {
+    // Die Zusage, auf der der Start steht: Sobald die Zugaenge eingetragen
+    // sind, kann sich ein Creator verbinden. Die Freigabe der Plattform
+    // entscheidet nur, WER zustimmen darf (eingetragene Testnutzer vs. jeder)
+    // — nicht, ob es den Knopf gibt. Ohne diesen Test koennte jemand die
+    // Bedingung "nur wenn freigegeben" einbauen und damit den Start um Wochen
+    // verschieben, ohne dass es auffaellt.
+    process.env.GOOGLE_CLIENT_ID = "x";
+    process.env.GOOGLE_CLIENT_SECRET = "y";
+    process.env.GOOGLE_REDIRECT_URI = "https://example.test/cb";
+    process.env.TIKTOK_CLIENT_KEY = "x";
+    process.env.TIKTOK_CLIENT_SECRET = "y";
+    process.env.TIKTOK_REDIRECT_URI = "https://example.test/cb";
+    process.env.IG_APP_ID = "x";
+    process.env.IG_APP_SECRET = "y";
+    process.env.IG_REDIRECT_URI = "https://example.test/cb";
+    // Ausdruecklich OHNE die Freigabe-Schalter.
+    delete process.env.GOOGLE_APP_LIVE;
+    delete process.env.TIKTOK_APP_LIVE;
+    delete process.env.IG_APP_LIVE;
+
+    for (const platform of ["youtube", "tiktok", "instagram"] as const) {
+      const stand = plattformBereitschaft(platform);
+      expect(stand.bereitschaft).toBe("nur_eingeladene");
+      expect(stand.href, `${platform} braucht einen Knopf`).not.toBeNull();
+    }
+  });
+
   it("führt YouTube auf die Google-Route, nicht auf eine youtube-Route", () => {
     process.env.GOOGLE_CLIENT_ID = "x";
     process.env.GOOGLE_CLIENT_SECRET = "y";

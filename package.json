@@ -25,7 +25,8 @@
     "logs": "docker compose logs -f",
     "setup": "./scripts/setup-local.sh",
     "testdb": "./scripts/test-db.sh test",
-    "admin": "tsx scripts/admin.mts"
+    "admin": "tsx scripts/admin.mts",
+    "verbinden": "tsx scripts/verbinden.mts"
   },
   "engines": {
     "node": ">=20"
