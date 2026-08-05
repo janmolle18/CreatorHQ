@@ -1,4 +1,5 @@
 import {
+  DARF_POSTEN,
   db,
   memberships,
   tenants,
@@ -40,6 +41,14 @@ export interface Session {
    * wessen Kanal er gerade ist, veröffentlicht im Namen eines Kunden.
    */
   alsAdminImFremdenKanal: boolean;
+  /**
+   * Darf in diesem Kanal etwas nach aussen gehen?
+   *
+   * Falsch bei `suspended`. Der Kanal bleibt vollständig lesbar — wer eine
+   * Rechnung übersieht, verliert keine Daten. Es geht nur nichts mehr in
+   * seinem Namen raus.
+   */
+  darfPosten: boolean;
 }
 
 function getSecret(): Uint8Array {
@@ -153,8 +162,33 @@ export const getSession = cache(async function getSession(): Promise<Session | n
     isPlatformAdmin: zeile.isPlatformAdmin,
     emailVerified: zeile.emailVerifiedAt !== null,
     alsAdminImFremdenKanal,
+    darfPosten: DARF_POSTEN.has(zeile.tenantStatus),
   };
 });
+
+/**
+ * Guard für alles, was den Kanal VERLÄSST: hochladen, veröffentlichen,
+ * Automatik einschalten.
+ *
+ * Bewusst getrennt von requireSession(): Ein gesperrter Kanal bleibt komplett
+ * lesbar. Nur nach aussen geht nichts.
+ *
+ * Das ist die zweite von zwei Sperren. Die erste sitzt im Worker unmittelbar
+ * vor dem Hochladen (worker/src/jobs/publish.ts) — die hier verhindert, dass
+ * ein Auftrag überhaupt entsteht, und kann dem Creator dabei sagen, warum.
+ */
+export async function requireDarfPosten(): Promise<Session> {
+  const session = await requireSession();
+  if (!session.darfPosten) {
+    redirect(
+      "/?fehler=" +
+        encodeURIComponent(
+          "Dein Kanal ist gesperrt — es geht gerade nichts raus. Deine Daten bleiben vollständig da."
+        )
+    );
+  }
+  return session;
+}
 
 /** Guard für die Betreiber-Zentrale. */
 export async function requirePlatformAdmin(): Promise<Session> {

@@ -1,5 +1,6 @@
 import {
   clips,
+  darfPosten,
   posts,
   settings,
   socialAccounts,
@@ -375,6 +376,33 @@ async function publishInstagram(
 export async function processPublish(job: Job<PostJob>): Promise<void> {
   const { postId, manual } = job.data;
   await imAuftragsMandanten(job, async (db, tenantId) => {
+    // Die Sperre — und zwar unmittelbar vor dem Senden, nicht beim Einreihen.
+    //
+    // Zwischen Klick und Hochladen liegen bei geplanten Posts Stunden. Wer in
+    // dieser Zeit gesperrt wird, darf nicht doch noch senden, nur weil sein
+    // Auftrag vor der Sperre in die Schlange kam. Deshalb hier eine frische
+    // Abfrage statt eines mitgereichten Werts.
+    //
+    // Anders als der Automatik-Schalter gilt das AUCH für von Hand ausgelöste
+    // Posts: Der Schalter ist eine Entscheidung des Creators über sein eigenes
+    // Konto, die Sperre eine des Betreibers über das Konto. Ein Klick hebt sie
+    // nicht auf.
+    if (!(await darfPosten(tenantId))) {
+      await db
+        .update(posts)
+        .set({
+          status: "awaiting_manual",
+          error: "Kanal gesperrt — bitte Zahlung prüfen",
+          updatedAt: new Date(),
+        })
+        .where(eq(posts.id, postId));
+      logger.warn(
+        { postId, tenantId },
+        "publish: abgelehnt — Kanal gesperrt",
+      );
+      return;
+    }
+
     // Zweite Sperre hinter dem Tick: Ein Job, der vor dem Ausschalten in die
     // Queue kam, darf danach nicht doch noch hochladen. Von Hand ausgelöste
     // Jobs sind ausgenommen — dort hat ein Mensch bewusst geklickt.

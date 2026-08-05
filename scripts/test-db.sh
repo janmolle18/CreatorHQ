@@ -59,7 +59,7 @@ case "${1:-test}" in
   down) runter ;;
   test)
     hoch
-    ( cd "$WURZEL" && TEST_DATABASE_URL="$URL" npx vitest run db/src/tenant.test.ts web/lib/email-tokens.test.ts )
+    ( cd "$WURZEL" && TEST_DATABASE_URL="$URL" npx vitest run db/src/tenant.test.ts db/src/sperre.test.ts web/lib/email-tokens.test.ts )
     ergebnis=$?
     runter
     exit $ergebnis

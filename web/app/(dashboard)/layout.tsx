@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { requireSession } from "@/lib/auth";
 import { NavLink } from "@/components/nav-link";
 import { RechtsFussleiste } from "@/components/rechts-fussleiste";
+import { supportAdresse } from "@/lib/betreiber";
 import { logoutAction } from "@/app/login/actions";
 import { verlasseKanalAction } from "@/app/(dashboard)/zentrale/actions";
 import { SubmitButton } from "@/components/submit-button";
@@ -60,6 +61,36 @@ function FremderKanalBand({ kanal }: { kanal: string }) {
   );
 }
 
+/**
+ * Band für einen gesperrten Kanal.
+ *
+ * Es steht dauerhaft oben, nicht als Meldung nach einem Klick: Ein Creator,
+ * der nicht weiss, warum nichts rausgeht, sucht den Fehler bei sich und
+ * schreibt irgendwann verärgert — oder gar nicht und kündigt.
+ *
+ * Der Ton ist bewusst nicht rot: Nichts ist kaputt, und die Daten sind alle
+ * da. Es fehlt eine Zahlung.
+ */
+function GesperrtBand() {
+  const hilfe = supportAdresse();
+  return (
+    <div className="sticky top-0 z-40 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-warn/30 bg-warn/[0.12] px-6 py-2.5">
+      <p className="text-meta text-ink">
+        <span className="font-semibold text-warn">Dein Kanal ist gesperrt.</span> Es geht gerade
+        nichts raus — deine Clips, Zahlen und Termine bleiben aber vollständig da.
+      </p>
+      {hilfe && (
+        <a
+          href={`mailto:${hilfe}?subject=${encodeURIComponent("Kanal wieder freischalten")}`}
+          className="text-meta font-medium text-ink underline underline-offset-4 hover:text-warn"
+        >
+          Freischaltung klären
+        </a>
+      )}
+    </div>
+  );
+}
+
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
   const navVerwaltung = session.isPlatformAdmin
@@ -69,6 +100,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   return (
     <>
       {session.alsAdminImFremdenKanal && <FremderKanalBand kanal={session.tenantName} />}
+      {!session.darfPosten && <GesperrtBand />}
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col md:grid md:grid-cols-[230px_1fr]">
       <aside className="flex flex-col border-b border-hairline px-6 py-6 md:sticky md:top-0 md:h-screen md:justify-between md:border-b-0 md:border-r md:py-10">
         <div>

@@ -86,6 +86,46 @@ export async function withTenantSession<T>(
  * ab. Das ist nicht nur wegen RLS so: Es macht die Reihenfolge fair — ein
  * Creator mit fünfzig wartenden Videos kann keinen anderen aushungern.
  */
+/**
+ * Zustände, in denen ein Kanal nach aussen wirken darf.
+ *
+ * Die EINE Quelle für „darf posten". Sie steht hier und nicht in der Weboberfläche,
+ * weil beide Seiten sie brauchen: Der Worker prüft sie unmittelbar vor dem
+ * Hochladen, die Server Actions prüfen sie beim Klick. Zwei Listen, die
+ * auseinanderlaufen können, wären genau die Lücke, die es zu schliessen gilt.
+ *
+ * `suspended` ist bewusst NICHT dabei, `trial` schon: Wer testet, soll posten
+ * dürfen — sonst probiert er das Produkt nie aus. Wer nicht zahlt, sieht seine
+ * Daten weiter, aber es geht nichts mehr in seinem Namen raus.
+ */
+export const DARF_POSTEN: ReadonlySet<string> = new Set(["trial", "active"]);
+
+/**
+ * Prüft unmittelbar vor dem Senden, ob dieser Kanal nach aussen wirken darf.
+ *
+ * Bewusst eine eigene Abfrage statt eines Werts aus der Sitzung: Zwischen dem
+ * Klick und dem Hochladen liegen bei geplanten Posts Stunden. Wer in dieser
+ * Zeit gesperrt wird, darf nicht doch noch senden, nur weil sein Auftrag vor
+ * der Sperre in die Schlange kam.
+ *
+ * Läuft über das globale Handle — `tenants` steht bewusst nicht unter der
+ * Mandantenregel, sie definiert sie.
+ */
+export async function darfPosten(
+  tenantId: string,
+  // Handle bewusst überschreibbar: Der Test prüft gegen eine Wegwerf-Datenbank,
+  // nicht gegen die des laufenden Systems.
+  handle: Pick<DB, "execute"> = db
+): Promise<boolean> {
+  const zeilen = await handle.execute<{ status: string }>(
+    sql`select status from tenants where id = ${tenantId}::uuid limit 1`
+  );
+  const status = [...zeilen][0]?.status;
+  // Kein Treffer → kein Senden. Fällt zu, nicht auf: Eine gelöschte Zeile darf
+  // nicht dadurch zur Freigabe werden, dass die Abfrage nichts findet.
+  return status !== undefined && DARF_POSTEN.has(status);
+}
+
 export async function aktiveMandanten(): Promise<string[]> {
   const zeilen = await db.execute<{ id: string }>(
     sql`select id from tenants where status in ('trial', 'active') order by created_at`

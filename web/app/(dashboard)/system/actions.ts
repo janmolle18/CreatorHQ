@@ -4,7 +4,7 @@ import { posts, settings } from "@creatorhq/db";
 import { inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { mitMandant, requireOwner, requireSession } from "@/lib/auth";
+import { mitMandant, requireOwner, requireSession, requireDarfPosten } from "@/lib/auth";
 import { analyticsQueue, commentsQueue, maintenanceQueue } from "@/lib/queues";
 import { nachziehPlan } from "@/lib/system";
 
@@ -23,6 +23,9 @@ export async function setAutoPublishAction(formData: FormData): Promise<void> {
   // Nur der Inhaber: Automatisches Posten im Namen des Creators ist keine
   // Entscheidung, die ein eingeladener Video-Editor treffen soll.
   await requireOwner();
+  // Und nur, wenn der Kanal überhaupt senden darf. Ausschalten bleibt immer
+  // erlaubt — einen Schalter, den man nur noch anlassen kann, will niemand.
+  if (an) await requireDarfPosten();
   await mitMandant((tx, session) =>
     tx
       .insert(settings)

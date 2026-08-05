@@ -5,7 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { mitMandant, requireSession } from "@/lib/auth";
+import { mitMandant, requireSession, requireDarfPosten } from "@/lib/auth";
 import { maintenanceQueue, publishQueue } from "@/lib/queues";
 
 /** Zustände, in denen ein Post noch nicht draußen ist (neu planbar/pushbar). */
@@ -58,6 +58,10 @@ export async function pushNowAction(formData: FormData): Promise<void> {
   const postId = String(formData.get("postId") ?? "");
   if (!postId) return;
 
+  // Die Sperre — VOR dem Mandanten-Block, weil sie umleitet und eine
+  // Umleitung innerhalb der Transaktion diese zurücknehmen würde.
+  await requireDarfPosten();
+
   // Umleitungen stehen NACH dem Block — innerhalb der Transaktion würden sie
   // die gerade geschriebene Terminänderung zurücknehmen.
   const { lage, tenantId } = await mitMandant(async (db, session) => {
@@ -95,6 +99,8 @@ export async function pushNowAction(formData: FormData): Promise<void> {
 export async function pushClipNowAction(formData: FormData): Promise<void> {
   const clipId = String(formData.get("clipId") ?? "");
   if (!clipId) return;
+
+  await requireDarfPosten();
 
   const { ids, tenantId } = await mitMandant(async (db, session) => {
     const connected = await connectedPlatforms(db);
