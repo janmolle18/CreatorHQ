@@ -72,7 +72,7 @@ export function picksToWindows(
 
   const adjusted: HookedWindow[] = [];
   for (const pick of picks) {
-    let startIndex = Math.min(last, Math.max(0, Math.min(pick.startIndex, pick.endIndex)));
+    const startIndex = Math.min(last, Math.max(0, Math.min(pick.startIndex, pick.endIndex)));
     let endIndex = Math.min(last, Math.max(0, Math.max(pick.startIndex, pick.endIndex)));
 
     const duration = () => sentences[endIndex]!.end - sentences[startIndex]!.start;

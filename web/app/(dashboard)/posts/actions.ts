@@ -5,7 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { mitMandant, requireSession, requireDarfPosten } from "@/lib/auth";
+import { mitMandant, requireDarfPosten } from "@/lib/auth";
 import { maintenanceQueue, publishQueue } from "@/lib/queues";
 
 /** Zustände, in denen ein Post noch nicht draußen ist (neu planbar/pushbar). */

@@ -157,19 +157,3 @@ export async function uploadVideo(opts: {
   );
   return { publishId: initData.data.publish_id };
 }
-
-/** Verarbeitungs-Status eines Uploads abfragen. */
-export async function fetchPublishStatus(accessToken: string, publishId: string) {
-  const res = await fetchWithRetry(`${OPEN_API}/v2/post/publish/status/fetch/`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "content-type": "application/json; charset=UTF-8",
-    },
-    body: JSON.stringify({ publish_id: publishId }),
-  });
-  return (await res.json()) as {
-    data?: { status: string; publicaly_available_post_id?: string[] };
-    error?: { code: string; message: string };
-  };
-}

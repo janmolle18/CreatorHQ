@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { socialAccounts, type SocialAccount } from "@creatorhq/db";
-import { PLATFORM_LABELS, PUBLISH_PLATFORMS, type PublishPlatform } from "@creatorhq/shared";
+import { socialAccounts } from "@creatorhq/db";
+import { PLATFORM_LABELS, PUBLISH_PLATFORMS } from "@creatorhq/shared";
 import { mitMandant } from "@/lib/auth";
 import { Button, Field, Input, PageHeader, StatusText } from "@/components/ui";
 import { ACCOUNT_STATUS } from "@/lib/status";

@@ -60,7 +60,6 @@ function ClipThumb({ clip }: { clip: Clip }) {
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- interner Same-Origin-Stream, kein next/image nötig
     <img
       src={`/api/clips/${clip.id}/thumb`}
       alt=""

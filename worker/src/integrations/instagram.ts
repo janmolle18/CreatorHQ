@@ -1,4 +1,3 @@
-import { env } from "../env.ts";
 import { logger } from "../logger.ts";
 import { TokenExpiredError } from "./errors.ts";
 import { fetchWithRetry } from "./http.ts";

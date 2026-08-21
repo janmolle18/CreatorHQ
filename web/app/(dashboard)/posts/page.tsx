@@ -82,7 +82,6 @@ function groupByClip(rows: Array<{ post: Post; clip: Clip }>): VideoGroup[] {
 function VideoThumb({ clip }: { clip: Clip }) {
   if (clip.thumbPath) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- interner Same-Origin-Stream
       <img
         src={`/api/clips/${clip.id}/thumb`}
         alt=""

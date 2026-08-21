@@ -23,7 +23,7 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { CopyButton } from "@/components/copy-button";
 import { EmptyState, PageHeader, SectionTitle, Status, StatusText } from "@/components/ui";
 import { checkInfra } from "@/lib/infra";
-import { POST_STATUS, postUrgency } from "@/lib/status";
+import { postUrgency } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
 

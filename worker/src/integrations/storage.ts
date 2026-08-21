@@ -5,7 +5,6 @@ import {
   CreateBucketCommand,
   DeleteObjectCommand,
   HeadBucketCommand,
-  ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createReadStream, createWriteStream } from "node:fs";
@@ -56,16 +55,6 @@ export async function downloadKeyToTmp(key: string, fileName?: string): Promise<
   return local;
 }
 
-/** Beliebige HTTP-URL in eine lokale tmp-Datei laden. */
-export async function downloadToTmp(url: string, fileName: string): Promise<string> {
-  await mkdir(TMP_DIR, { recursive: true });
-  const local = path.join(TMP_DIR, fileName);
-  const res = await fetch(url);
-  if (!res.ok || !res.body) throw new Error(`Download fehlgeschlagen ${res.status}: ${url}`);
-  await pipeline(Readable.fromWeb(res.body as never), createWriteStream(local));
-  return local;
-}
-
 /** Presigned GET-URL (z. B. für Player oder PULL_FROM_URL-Uploads). */
 export async function presignGet(key: string, expiresIn = 3600): Promise<string> {
   return getSignedUrl(s3, new GetObjectCommand({ Bucket: env.s3.bucket, Key: key }), {
@@ -73,7 +62,6 @@ export async function presignGet(key: string, expiresIn = 3600): Promise<string>
   });
 }
 
-/** Objekt-Keys unter einem Prefix auflisten (Verifikation/Debugging). */
 /**
  * Objekt entfernen. Scheitert leise: eine nicht gelöschte Datei kostet Platz,
  * darf aber keinen Job kippen.
@@ -86,11 +74,4 @@ export async function deleteObject(key: string): Promise<boolean> {
     logger.warn({ err, key }, "storage: Objekt nicht entfernt");
     return false;
   }
-}
-
-export async function listKeys(prefix?: string): Promise<string[]> {
-  const res = await s3.send(
-    new ListObjectsV2Command({ Bucket: env.s3.bucket, Prefix: prefix })
-  );
-  return (res.Contents ?? []).map((o) => o.Key ?? "").filter(Boolean);
 }

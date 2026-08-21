@@ -34,11 +34,6 @@ export async function getChannelUploads(identifier: string): Promise<DiscoveredV
   return listUploadsViaYtdlp(identifier);
 }
 
-/** Kennzahlen (Views/Likes/Kommentare) zu Video-IDs — leer ohne API-Key. */
-export async function getVideoStats(ids: readonly string[]): Promise<Map<string, VideoDetails>> {
-  return fetchDetailsSafely(ids);
-}
-
 /**
  * Details holen, ohne den ganzen Scan zu kippen: fällt die videos-API aus,
  * arbeiten wir ohne Dauer weiter — die Sperre im Clip-Job greift trotzdem.

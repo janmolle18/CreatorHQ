@@ -7,7 +7,7 @@ import {
   type TenantDB,
 } from "@creatorhq/db";
 import { requireSession } from "@/lib/auth";
-import { PLATFORM_LABELS, PLATFORM_SHORT, type PublishPlatform } from "@creatorhq/shared";
+import { PLATFORM_SHORT, type PublishPlatform } from "@creatorhq/shared";
 import { and, asc, eq, gte, isNull, isNotNull } from "drizzle-orm";
 import { BarList, LineChart, type LineSeries } from "@/components/charts";
 import { EmptyState, PageHeader, SectionTitle, Stat } from "@/components/ui";

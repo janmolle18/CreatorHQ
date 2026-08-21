@@ -6,7 +6,6 @@ import {
   settings,
   socialAccounts,
   sourceVideos,
-  withTenant,
   type DB,
 } from "@creatorhq/db";
 import {

@@ -37,8 +37,8 @@ function getDb(): PostgresJsDatabase<typeof schema> {
 // Proxy, damit `db.select(...)` weiterhin direkt funktioniert.
 export const db = new Proxy({} as PostgresJsDatabase<typeof schema>, {
   get(_t, prop) {
-    const real = getDb() as any;
-    const value = real[prop];
+    const real = getDb();
+    const value: unknown = Reflect.get(real, prop, real);
     return typeof value === "function" ? value.bind(real) : value;
   },
 });

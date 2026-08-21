@@ -7,7 +7,7 @@ import {
   sourceVideos,
   withTenant,
 } from "@creatorhq/db";
-import { and, desc, eq, isNotNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, lte, sql } from "drizzle-orm";
 import { requireSession } from "@/lib/auth";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -22,7 +22,7 @@ import {
   Table,
   Td,
 } from "@/components/ui";
-import { DEFAULT_TIMEZONE, formatInTz, YOUTUBE_UPLOADS_PRO_TAG } from "@creatorhq/shared";
+import { formatInTz, YOUTUBE_UPLOADS_PRO_TAG } from "@creatorhq/shared";
 import { checkInfra, queueDepths } from "@/lib/infra";
 import { pruefeEinrichtung, verbindenMoeglich } from "@/lib/einrichtung-pruefen";
 import {

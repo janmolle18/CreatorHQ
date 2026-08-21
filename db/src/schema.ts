@@ -46,7 +46,8 @@ export const accountStatusEnum = pgEnum("account_status", [
   "disconnected", // angelegt, aber kein OAuth
   "connected", // OAuth aktiv, postbereit
   "expired", // Token ungültig → „Neu verbinden"
-  "disabled", // manuell pausiert
+  // „disabled" (manuell pausiert) ist vorgesehen, wird aktuell aber nirgends gesetzt.
+  "disabled",
 ]);
 
 export const sourceStatusEnum = pgEnum("source_status", [
@@ -101,6 +102,8 @@ export const briefingStatusEnum = pgEnum("briefing_status", [
   "failed",
 ]);
 
+// Aktuell schreibt nur die Planung „shoot" — die übrigen Werte sind für den
+// Kalender-Ausbau vorgesehen, aber noch nicht verdrahtet.
 export const calendarKindEnum = pgEnum("calendar_kind", [
   "shoot",
   "post",
@@ -119,7 +122,9 @@ export const tenantStatusEnum = pgEnum("tenant_status", [
 
 export const membershipRoleEnum = pgEnum("membership_role", [
   "owner", // darf Konten verbinden, Abo ändern, Mitglieder einladen
-  "editor", // darf Clips freigeben und posten, aber nichts Vertragliches
+  // „editor" (darf Clips freigeben und posten, aber nichts Vertragliches) ist für
+  // den Einladungs-Flow vorgesehen — aktuell wird nur „owner" vergeben.
+  "editor",
 ]);
 
 export const emailTokenPurposeEnum = pgEnum("email_token_purpose", [
@@ -348,7 +353,7 @@ export const sourceVideos = pgTable(
   })
 );
 
-export const clips = pgTable("clips",   {
+export const clips = pgTable("clips", {
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: uuid("tenant_id")
       .notNull()
@@ -515,7 +520,7 @@ export const briefings = pgTable(
   })
 );
 
-export const ideas = pgTable("ideas",   {
+export const ideas = pgTable("ideas", {
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: uuid("tenant_id")
       .notNull()
@@ -543,7 +548,7 @@ export const ideas = pgTable("ideas",   {
   })
 );
 
-export const calendarItems = pgTable("calendar_items",   {
+export const calendarItems = pgTable("calendar_items", {
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: uuid("tenant_id")
       .notNull()
