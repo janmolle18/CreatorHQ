@@ -13,3 +13,6 @@ cookies.txt
 # Nächtliche Postgres-Dumps (lokal, nie committen)
 backups/
 logs/
+
+# Next.js Standalone-Build legt den absoluten Pfad als Ordner an
+"Projekte claude"/
