@@ -22,7 +22,7 @@ export interface DigestSnapshot {
   views?: number;
 }
 
-/** Kennzahlen eines von Davids eigenen Kanal-Videos (Referenz-Messung). */
+/** Kennzahlen eines eigenen Kanal-Videos des Creators (Referenz-Messung). */
 export interface DigestVideoPerformance {
   title: string | null;
   durationSeconds: number | null;
@@ -39,7 +39,7 @@ export interface DigestInput {
   scheduledNext: Array<{ platform: string; scheduledAt: string }>;
   openIdeas: string[];
   videoTitles: string[];
-  /** Davids eigene Kanal-Videos mit aktuellen Zahlen — daraus lernen wir. */
+  /** Eigene Kanal-Videos des Creators mit aktuellen Zahlen — daraus lernen wir. */
   videoPerformance?: DigestVideoPerformance[];
 }
 

@@ -48,7 +48,7 @@ describe("heuristicCaption", () => {
   test("nimmt den ersten Satz des Transkripts", () => {
     const result = heuristicCaption(
       "Heute wird alles anders, versprochen! Und zwar richtig.",
-      "David"
+      "Alex"
     );
 
     expect(result.caption).toBe("Heute wird alles anders, versprochen!");
@@ -56,9 +56,9 @@ describe("heuristicCaption", () => {
   });
 
   test("fällt bei leerem Transkript auf Standard-Caption zurück", () => {
-    const result = heuristicCaption("", "David");
+    const result = heuristicCaption("", "Alex");
 
-    expect(result.caption).toBe("Neuer Clip von David");
-    expect(result.hashtags).toContain("#david");
+    expect(result.caption).toBe("Neuer Clip von Alex");
+    expect(result.hashtags).toContain("#alex");
   });
 });

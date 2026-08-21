@@ -39,7 +39,7 @@ export const sourceKindEnum = pgEnum("source_kind", [
 
 export const clipOriginEnum = pgEnum("clip_origin", [
   "pipeline", // aus der eigenen Clip-Pipeline
-  "imported", // fertiger Clip (z. B. Davids Instagram-Clips)
+  "imported", // fertiger Clip (z. B. importierte Instagram-Clips)
 ]);
 
 export const accountStatusEnum = pgEnum("account_status", [
@@ -76,7 +76,7 @@ export const postStatusEnum = pgEnum("post_status", [
   "uploading",
   "posted", // per API übergeben (z. B. TikTok-Inbox, YouTube privat)
   "published", // öffentlich live
-  "awaiting_manual", // Manual-Fallback: Jan/David posten selbst
+  "awaiting_manual", // Manual-Fallback: der Creator postet selbst
   "failed",
 ]);
 
@@ -263,7 +263,7 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Generalisiert ClipPilots `tiktok_accounts` für alle drei Plattformen.
+// Generalisiert das frühere `tiktok_accounts`-Schema für alle drei Plattformen.
 export const socialAccounts = pgTable(
   "social_accounts",
   {
@@ -430,7 +430,7 @@ export const metricsSnapshots = pgTable(
       .references(() => socialAccounts.id, { onDelete: "cascade" }),
     // NULL = Account-Ebene (z. B. Follower), sonst Post-Ebene.
     postId: uuid("post_id").references(() => posts.id, { onDelete: "cascade" }),
-    // Gesetzt für Davids eigene Kanal-Videos (v. a. seine fertigen Shorts), die
+    // Gesetzt für eigene Kanal-Videos des Creators (v. a. fertige Shorts), die
     // nicht über CreatorHQ gepostet wurden — daraus lernen wir, was funktioniert.
     sourceVideoId: uuid("source_video_id").references(() => sourceVideos.id, {
       onDelete: "cascade",
@@ -456,7 +456,7 @@ export const comments = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     platform: publishPlatformEnum("platform").notNull(),
     // NULL, wenn der Kommentar zu einem Video gehört, das nicht über CreatorHQ
-    // gepostet wurde (z. B. Davids 4 Bestandsvideos).
+    // gepostet wurde (z. B. Bestandsvideos des Kanals).
     postId: uuid("post_id").references(() => posts.id, { onDelete: "set null" }),
     externalVideoId: text("external_video_id").notNull(),
     externalCommentId: text("external_comment_id").notNull(),

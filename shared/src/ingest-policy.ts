@@ -1,6 +1,6 @@
 // Entscheidet, was die Pipeline zerschneiden darf.
 //
-// Davids fertige Shorts (und importierte Instagram-Clips) sind Endprodukte:
+// Fertige Shorts (und importierte Instagram-Clips) sind Endprodukte:
 // Sie werden gemessen, damit wir aus ihrer Performance lernen — aber niemals
 // neu geschnitten oder neu gerendert. Geclippt wird ausschließlich Langmaterial
 // (YouTube-Langvideos, Twitch-VODs).

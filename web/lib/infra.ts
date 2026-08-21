@@ -27,7 +27,7 @@ function short(error: unknown): string {
 /**
  * Anzeigename der Datenbank — aus der echten Verbindung, nicht fest verdrahtet.
  *
- * Vorher stand hier eine feste Zeichenkette, die nach dem Fork aus DavidHQ auf
+ * Vorher stand hier eine feste Zeichenkette, die nach dem Fork aus dem Schwesterprojekt auf
  * dessen Hafen zeigte: Die Systemseite behauptete 5433, verbunden war 5435.
  * Eine Statusseite, die etwas anderes sagt als die Wirklichkeit, ist schlimmer
  * als keine.

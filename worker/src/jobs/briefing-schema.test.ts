@@ -78,7 +78,7 @@ describe("parseBriefingJson: Selbstkorrektur des Modells", () => {
 
 describe("parseBriefingJson: Anführungszeichen im Fließtext", () => {
   test("ein einzelnes Anführungszeichen vor dem JSON verschluckt es nicht", () => {
-    const raw = `Davids "bestes Video lief gut. Hier das Ergebnis:\n${JSON.stringify(VALID)}`;
+    const raw = `Das "beste Video lief gut. Hier das Ergebnis:\n${JSON.stringify(VALID)}`;
     expect(parseBriefingJson(raw)?.summaryMd).toBe(VALID.summaryMd);
   });
 

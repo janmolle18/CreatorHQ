@@ -1,7 +1,7 @@
 import { env } from "../env.ts";
 import type { DiscoveredVideo } from "./youtube.ts";
 
-// Twitch-VOD-Discovery (vorbereitet; aktiv, sobald David auf Twitch streamt
+// Twitch-VOD-Discovery (vorbereitet; aktiv, sobald der Creator auf Twitch streamt
 // und TWITCH_CLIENT_ID/SECRET gesetzt sind). 1:1 aus ClipPilot.
 
 const HELIX = "https://api.twitch.tv/helix";

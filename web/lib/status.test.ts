@@ -33,11 +33,11 @@ describe("Status-Registry", () => {
     }
   });
 
-  test("erledigt ist grün, David-ist-dran gelb, kaputt rot", () => {
+  test("erledigt ist grün, Creator-ist-dran gelb, kaputt rot", () => {
     expect(POST_STATUS.published.tone).toBe("ok");
     expect(POST_STATUS.awaiting_manual.tone).toBe("warn");
     // Übergeben ≠ veröffentlicht: TikTok-Inbox und privates YouTube-Video
-    // brauchen noch einen Handgriff von David.
+    // brauchen noch einen Handgriff des Creators.
     expect(POST_STATUS.posted.tone).toBe("warn");
     expect(POST_STATUS.failed.tone).toBe("err");
   });

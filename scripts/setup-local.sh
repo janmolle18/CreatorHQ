@@ -66,4 +66,4 @@ echo
 echo "  Starten:   npm run web:dev"
 echo "  Ansehen:   http://localhost:3001/registrieren"
 echo
-grau "  Davids Dashboard läuft weiter auf Port 3000 — die beiden stören sich nicht."
+grau "  Ein Schwesterprojekt auf Port 3000 läuft parallel weiter — die beiden stören sich nicht."

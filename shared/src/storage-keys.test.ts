@@ -33,7 +33,7 @@ describe("Speicher-Schlüssel je Mandant", () => {
   });
 
   it("gibt bei Altbestand ohne Präfix null zurück", () => {
-    // Aus DavidHQ übernommene Pfade sahen so aus. Der Aufrufer muss diesen
+    // Aus dem Schwesterprojekt übernommene Pfade sahen so aus. Der Aufrufer muss diesen
     // Fall erkennen, statt ihn versehentlich einem Mandanten zuzuordnen.
     expect(mandantAusSchluessel("sources/abc.mp4")).toBeNull();
   });

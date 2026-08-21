@@ -6,7 +6,7 @@ import path from "node:path";
 config({ path: path.resolve(process.cwd(), "..", ".env") });
 config();
 
-// Worker-Env: zentral gelesen und validiert. Muster aus ClipPilot, erweitert.
+// Worker-Env: zentral gelesen und validiert.
 // Dev: cwd = CreatorHQ/worker (npm -w) → ../tmp; Docker: WORKDIR /app/worker → /app/tmp.
 
 function required(name: string): string {
@@ -95,6 +95,6 @@ export const env = {
   pipeline: {
     discoveryCron: optional("DISCOVERY_CRON", "0 6 * * *"),
     // Fallback-Handle, solange settings.youtubeChannelId leer ist.
-    defaultYoutubeHandle: optional("DEFAULT_YOUTUBE_HANDLE", "@davidvorkamera"),
+    defaultYoutubeHandle: optional("DEFAULT_YOUTUBE_HANDLE", "@beispielkanal"),
   },
 };

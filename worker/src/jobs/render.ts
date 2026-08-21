@@ -59,7 +59,7 @@ export async function processRender(job: Job<RenderJob>): Promise<void> {
     }
 
     // Harte Sperre: importierte Clips (Instagram & Co.) sind fertige Videos.
-    // Sie werden veröffentlicht wie sie sind — nie neu enkodiert, damit Davids
+    // Sie werden veröffentlicht wie sie sind — nie neu enkodiert, damit die
     // Originalqualität erhalten bleibt. Nur ein ausdrückliches reframe-Flag
     // öffnet den Blur-Reframe; der „Neu rendern“-Knopf setzt es nicht.
     if (clip.origin === "imported" && !reframe) {

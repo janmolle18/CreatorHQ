@@ -7,13 +7,13 @@ import {
 } from "./ingest-policy";
 
 describe("classifySource", () => {
-  test("Davids Langvideos sind Clip-Material", () => {
+  test("Langvideos sind Clip-Material", () => {
     for (const durationSeconds of [322, 567, 578, 1323]) {
       expect(classifySource({ durationSeconds })).toBe("clip_material");
     }
   });
 
-  test("Davids fertige Shorts sind nur Referenz", () => {
+  test("Fertige Shorts sind nur Referenz", () => {
     for (const durationSeconds of [5, 9, 17, 22, 37, 90, 91]) {
       expect(classifySource({ durationSeconds })).toBe("reference");
     }

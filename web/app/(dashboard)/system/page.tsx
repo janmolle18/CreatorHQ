@@ -453,14 +453,18 @@ export default async function SystemPage() {
         <SectionTitle>Öffentlicher Zugang</SectionTitle>
         <Card>
           <Zeile label="Einstiegslink">
-            <a
-              href="https://creatorhq.vercel.app"
-              target="_blank"
-              rel="noreferrer"
-              className="underline-offset-4 hover:underline"
-            >
-              creatorhq.vercel.app ↗
-            </a>
+            {process.env.PUBLIC_ENTRY_URL ? (
+              <a
+                href={process.env.PUBLIC_ENTRY_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline-offset-4 hover:underline"
+              >
+                {process.env.PUBLIC_ENTRY_URL.replace(/^https?:\/\//, "")} ↗
+              </a>
+            ) : (
+              <span className="text-ink-soft">nicht konfiguriert (PUBLIC_ENTRY_URL)</span>
+            )}
           </Zeile>
           <Zeile label="Zeigt aktuell auf">
             {zugang.tunnelUrl ? (

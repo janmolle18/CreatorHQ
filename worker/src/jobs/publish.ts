@@ -170,7 +170,7 @@ async function publishTiktok(
     await db
       .update(posts)
       .set({
-        // Inbox-Modus: an TikTok übergeben, David postet mit 2 Taps aus der Inbox.
+        // Inbox-Modus: an TikTok übergeben, der Creator postet mit 2 Taps aus der Inbox.
         status: "posted",
         postedAt: new Date(),
         externalPostId: publishId,

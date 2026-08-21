@@ -333,7 +333,7 @@ export function ProductionSection({
                 <Input
                   name="hashtags"
                   defaultValue={clip.hashtags.join(" ")}
-                  placeholder="#david #clips"
+                  placeholder="#creator #clips"
                 />
               </Field>
               <Button type="submit">Speichern</Button>

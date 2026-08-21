@@ -26,6 +26,6 @@ describe("slugify", () => {
   });
 
   it("behandelt Groß- und Kleinschreibung gleich", () => {
-    expect(slugify("DavidHQ")).toBe(slugify("davidhq"));
+    expect(slugify("CreatorHQ")).toBe(slugify("creatorhq"));
   });
 });

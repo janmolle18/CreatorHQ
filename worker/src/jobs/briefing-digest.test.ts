@@ -46,7 +46,7 @@ describe("buildInputDigest", () => {
     const comments = Array.from({ length: 40 }, (_, i) => makeComment(`c${i}`, i));
 
     const digest = buildInputDigest({
-      creatorName: "David",
+      creatorName: "Alex",
       comments,
       accountSnapshots: [],
       publishedLast7d: [],
@@ -67,7 +67,7 @@ describe("buildInputDigest", () => {
 
   test("lange Kommentartexte werden abgeschnitten", () => {
     const digest = buildInputDigest({
-      creatorName: "David",
+      creatorName: "Alex",
       comments: [makeComment("c1", 5, "x".repeat(500))],
       accountSnapshots: [],
       publishedLast7d: [],
@@ -83,7 +83,7 @@ describe("buildInputDigest", () => {
 
   test("leere Eingaben ergeben leeren, aber validen Digest", () => {
     const digest = buildInputDigest({
-      creatorName: "David",
+      creatorName: "Alex",
       comments: [],
       accountSnapshots: [],
       publishedLast7d: [],
@@ -131,7 +131,7 @@ describe("buildPerformanceDigest", () => {
 
   test("ohne Messwerte bleibt der Digest ohne Performance-Block", () => {
     const digest = buildInputDigest({
-      creatorName: "David",
+      creatorName: "Alex",
       comments: [],
       accountSnapshots: [],
       publishedLast7d: [],
@@ -144,7 +144,7 @@ describe("buildPerformanceDigest", () => {
 
   test("mit Messwerten hängt der Digest den Performance-Block an", () => {
     const digest = buildInputDigest({
-      creatorName: "David",
+      creatorName: "Alex",
       comments: [],
       accountSnapshots: [],
       publishedLast7d: [],

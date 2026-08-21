@@ -32,7 +32,7 @@ export function buildVideoMetadata(input: {
   const rawTitle =
     sanitize(input.title ?? "") ||
     sanitize(input.caption ?? "") ||
-    `Neuer Clip von ${input.creatorName ?? "David"}`;
+    `Neuer Clip von ${input.creatorName ?? "Creator"}`;
   const title =
     rawTitle.length > MAX_TITLE_LENGTH
       ? `${rawTitle.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…`

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import type { NextRequest } from "next/server";
 import { appOrigin, appUrl } from "./origin";
 
-// Der Fall, der David den Termin gekostet hätte: `next start` ersetzt den Host
+// Der Fall, der fast den Demo-Termin gekostet hätte: `next start` ersetzt den Host
 // in req.url durch die Bind-Adresse. Hinter dem Tunnel wäre er nach der
 // Zustimmung auf localhost:3000 gelandet — auf seinem eigenen Handy.
 function anfrage(headers: Record<string, string>, url = "http://localhost:3000/api/oauth/x"): NextRequest {

@@ -175,5 +175,4 @@ if (fertig === 0) {
 console.log();
 console.log(F.grau("  Danach: Server neu starten, auf /verbinden verbinden,"));
 console.log(F.grau("  dann dort »Kann hochgeladen werden?« drücken — das fragt die Plattform."));
-console.log(F.grau("  Ausführlich: docs/verbinden-einrichten.md"));
 console.log();

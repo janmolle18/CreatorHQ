@@ -151,7 +151,7 @@ export async function backupInfo(): Promise<BackupInfo> {
 }
 
 export interface ZugangInfo {
-  /** Adresse, auf die creatorhq.vercel.app aktuell zeigt. */
+  /** Adresse, auf die der öffentliche Einstiegslink aktuell zeigt. */
   tunnelUrl: string | null;
   /** Wann der Wächter das Ziel zuletzt geschrieben hat. */
   syncAlterMinuten: number | null;

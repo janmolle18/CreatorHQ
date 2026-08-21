@@ -29,7 +29,7 @@ describe("parseYoutubeVideoId", () => {
 
   test("Unsinn wird abgelehnt", () => {
     expect(parseYoutubeVideoId("https://example.com/watch?v=dQw4w9WgXcQ")).toBeNull();
-    expect(parseYoutubeVideoId("https://youtube.com/@davidvorkamera")).toBeNull();
+    expect(parseYoutubeVideoId("https://youtube.com/@beispielkanal")).toBeNull();
     expect(parseYoutubeVideoId("zu-kurz")).toBeNull();
     expect(parseYoutubeVideoId("")).toBeNull();
   });
@@ -37,8 +37,8 @@ describe("parseYoutubeVideoId", () => {
 
 describe("parseYoutubeChannel", () => {
   test("Handle-Link und /channel/-Link", () => {
-    expect(parseYoutubeChannel("https://www.youtube.com/@davidvorkamera")).toBe(
-      "@davidvorkamera"
+    expect(parseYoutubeChannel("https://www.youtube.com/@beispielkanal")).toBe(
+      "@beispielkanal"
     );
     expect(parseYoutubeChannel("https://youtube.com/channel/UCabc123")).toBe("UCabc123");
   });

@@ -16,7 +16,7 @@ const QUEUES = [
 
 // KEIN Fallwert. Dieses Skript ruft obliterate({ force: true }) — es löscht
 // alles, was es findet, ohne Rückfrage. Ein geratenes Ziel wäre hier kein
-// Komfort: Auf diesem Rechner läuft nebenan DavidHQ auf 6380, und ein Aufruf
+// Komfort: Auf diesem Rechner läuft nebenan das Schwesterprojekt auf 6380, und ein Aufruf
 // aus dem falschen Verzeichnis hätte dessen Aufträge gelöscht statt der
 // eigenen. Wer löschen will, sagt wo.
 if (!process.env.REDIS_URL) {

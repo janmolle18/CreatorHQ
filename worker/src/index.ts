@@ -452,7 +452,7 @@ const maintenanceWorker = new Worker(
           //
           // `downloaded` ist ein Durchgangszustand: Der Download-Auftrag reiht
           // den Schnitt direkt hinterher. Reisst diese eine Verbindung, blieb
-          // die Quelle ohne diesen Sweep für immer liegen — in DavidHQ lagen
+          // die Quelle ohne diesen Sweep für immer liegen — im Schwesterprojekt lagen
           // genau so zwei Videos fünf Tage da, ohne Fehlermeldung.
           //
           // Keine Endlosschleife: Scheitert der Schnitt, setzt clip.ts die

@@ -70,7 +70,7 @@ function balancedObjectAt(raw: string, start: number): string | null {
  *
  * Bewusst ab JEDER öffnenden Klammer neu ansetzen statt einmal durchzulaufen:
  * Fließtext vor dem JSON kann ein einzelnes Anführungszeichen enthalten
- * („Davids 'bestes' Video" oder ein Apostroph-Zoll), das einen durchgehenden
+ * („Das ›beste‹ Video" oder ein Apostroph-Zoll), das einen durchgehenden
  * Scan in einen vermeintlichen Zeichenketten-Modus kippen und damit das echte
  * JSON verschlucken würde.
  */

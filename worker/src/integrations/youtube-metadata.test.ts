@@ -15,9 +15,9 @@ describe("buildVideoMetadata", () => {
       buildVideoMetadata({ title: null, caption: "Die Caption", hashtags: [] }).title
     ).toBe("Die Caption");
     expect(
-      buildVideoMetadata({ title: null, caption: null, hashtags: [], creatorName: "David" })
+      buildVideoMetadata({ title: null, caption: null, hashtags: [], creatorName: "Alex" })
         .title
-    ).toBe("Neuer Clip von David");
+    ).toBe("Neuer Clip von Alex");
   });
 
   test("kürzt überlange Titel auf 100 Zeichen mit Ellipse", () => {
@@ -45,12 +45,12 @@ describe("buildVideoMetadata", () => {
     const { tags } = buildVideoMetadata({
       title: "t",
       caption: null,
-      hashtags: ["#david", "#david", "#clips", `#${"lang".repeat(30)}`],
+      hashtags: ["#alex", "#alex", "#clips", `#${"lang".repeat(30)}`],
     });
 
-    expect(tags).toContain("david");
+    expect(tags).toContain("alex");
     expect(tags).toContain("clips");
-    expect(tags.filter((t) => t === "david")).toHaveLength(1);
+    expect(tags.filter((t) => t === "alex")).toHaveLength(1);
     expect(tags.join("").length).toBeLessThanOrEqual(MAX_TAGS_TOTAL_LENGTH);
   });
 

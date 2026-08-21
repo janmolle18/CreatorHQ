@@ -38,8 +38,7 @@ export function AngabenFehlen({ was }: { was: string }) {
       <p className="mt-2 text-sm text-ink-soft">
         Für diese Seite fehlen die Betreiberangaben ({was}). Sie werden über die
         Umgebungsvariablen <code className="text-ink">BETREIBER_*</code> gesetzt — siehe{" "}
-        <code className="text-ink">.env.example</code> und{" "}
-        <code className="text-ink">docs/betrieb.md</code>.
+        <code className="text-ink">.env.example</code>.
       </p>
       <p className="mt-2 text-sm text-ink-soft">
         Solange sie fehlen, ist die Seite unvollständig. Google und Meta prüfen sie im

@@ -231,7 +231,7 @@ async function collectYoutube(
       }
     }
 
-    // Referenz-Messung: Davids eigene Kanal-Videos — vor allem seine fertigen
+    // Referenz-Messung: eigene Kanal-Videos des Creators — vor allem fertige
     // Shorts, die nie durch CreatorHQ liefen. Daraus lernt das Briefing, welche
     // Formate funktionieren. Ein Aufruf je 50 Videos, 1 Quota-Unit.
     const channelVideos = await db

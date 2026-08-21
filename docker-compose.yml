@@ -1,8 +1,8 @@
 name: creatorhq
 
-# Host-Ports sind gegenüber DavidHQ verschoben (5435/6381/9004/9005), damit beide
+# Host-Ports sind gegenüber dem Schwesterprojekt verschoben (5435/6381/9004/9005), damit beide
 # Projekte gleichzeitig laufen können. Alle Ports binden nur an
-# 127.0.0.1 — nichts ist im LAN erreichbar (ClipPilot-Schwäche behoben).
+# 127.0.0.1 — nichts ist im LAN erreichbar (Schwäche des Vorgängers behoben).
 
 services:
   postgres:
@@ -50,7 +50,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       # Named Volume statt Bind-Mount: vermeidet "resource deadlock avoided"
-      # bei großen Uploads auf dem virtualisierten Mac-Dateisystem (ClipPilot-Erfahrung).
+      # bei großen Uploads auf dem virtualisierten Mac-Dateisystem (Erfahrung aus dem Vorgängerprojekt).
       - minio_data:/data
     ports:
       - "127.0.0.1:9004:9000"

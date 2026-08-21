@@ -4,22 +4,22 @@ import { describe, expect, it } from "vitest";
 
 // Wächter über die Häfen der Nachbarschaft.
 //
-// CreatorHQ ist aus DavidHQ geforkt. Beide laufen auf demselben Mac, beide
+// CreatorHQ ist aus einem Schwesterprojekt geforkt. Beide laufen auf demselben Mac, beide
 // haben Postgres, Redis und MinIO — nur auf verschobenen Häfen. Die Fallwerte
 // im Code zeigten nach dem Fork weiter auf DIE ALTEN: Wer `REDIS_URL` nicht
-// setzt, landete stillschweigend in Davids Redis.
+// setzt, landete stillschweigend in der fremden Redis.
 //
 // Das ist kein Schönheitsfehler. `scripts/clear-queues.mjs` ruft
 // `obliterate({ force: true })` auf jede Queue — mit dem alten Fallwert hätte
-// ein Aufruf aus dem falschen Verzeichnis Davids Aufträge gelöscht, nicht die
+// ein Aufruf aus dem falschen Verzeichnis fremde Aufträge gelöscht, nicht die
 // eigenen. Ein Fallwert, der auf ein FREMDES laufendes System zeigt, ist kein
 // Komfort, sondern eine geladene Waffe.
 //
-// Deshalb: Davids Häfen dürfen im CreatorHQ-Quelltext nicht vorkommen.
+// Deshalb: die fremden Häfen dürfen im CreatorHQ-Quelltext nicht vorkommen.
 
 const WURZEL = path.resolve(import.meta.dirname, "../..");
 
-/** Was auf diesem Rechner zu DavidHQ gehört — Wert: was CreatorHQ nutzt. */
+/** Was auf diesem Rechner zum Schwesterprojekt gehört — Wert: was CreatorHQ nutzt. */
 const FREMDE_HAEFEN = new Map<string, string>([
   ["5433", "Postgres — CreatorHQ liegt auf 5435"],
   ["6380", "Redis — CreatorHQ liegt auf 6381"],
@@ -92,7 +92,7 @@ describe("Häfen fremder Projekte", () => {
 
     expect(
       verstoesse,
-      "Diese Dateien zeigen auf DavidHQs laufende Infrastruktur. Ein fehlendes " +
+      "Diese Dateien zeigen auf die laufende Infrastruktur des Schwesterprojekts. Ein fehlendes " +
         "Env würde CreatorHQ dorthin verbinden — im schlimmsten Fall schreibend."
     ).toEqual([]);
   });

@@ -84,7 +84,7 @@ async function gatherDigest(
       )
     );
 
-  // Referenz-Messung: jüngster Stand je Kanal-Video (auch Davids fertige
+  // Referenz-Messung: jüngster Stand je Kanal-Video (auch fertige
   // Shorts, die nie durch CreatorHQ liefen) — die Lernquelle „was funktioniert“.
   const performanceRows = await db
     .select({
